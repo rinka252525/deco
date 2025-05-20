@@ -190,7 +190,11 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
             sum2 = sum(v[1][lanes[i]] for i, v in enumerate(team2))
             if abs(sum1 - sum2) <= 50:
                 return team1, team2
-                    if result:
+        return None  # ← 関数の最後に return None を正しく配置
+
+    result = valid_teams(player_data)
+
+    if result:
         team1, team2 = result
 
         # チームデータ保存（勝敗更新用）
@@ -198,11 +202,7 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
             'team1': team1,
             'team2': team2
         }
-        return None
 
-    result = valid_teams(player_data)
-    if result:
-        team1, team2 = result
         lanes = ['top', 'jg', 'mid', 'adc', 'sup']
         msg = "**✅ Team A**\n"
         for i in range(5):
@@ -213,6 +213,7 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
         await ctx.send(msg)
     else:
         await ctx.send("⚠ 条件に合うチーム分けが見つかりませんでした。ごめんなさい。")
+
 
 @bot.command()
 async def win(ctx, team: str):
