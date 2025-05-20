@@ -71,6 +71,18 @@ async def delete_ability(ctx, member: discord.Member):
     else:
         await ctx.send(f"{member.mention} のデータは存在しません。")
 
+import unicodedata
+
+def get_display_width(text):
+    """文字列の見た目の幅を取得（全角2、半角1としてカウント）"""
+    return sum(2 if unicodedata.east_asian_width(c) in 'WF' else 1 for c in text)
+
+def pad_display_name(name, width):
+    """指定幅に合わせてパディング"""
+    current_width = get_display_width(name)
+    padding = width - current_width
+    return name + ' ' * padding
+
 @bot.command()
 async def show(ctx):
     if not active:
@@ -81,7 +93,6 @@ async def show(ctx):
         await ctx.send("データがありません。")
         return
 
-    # 合計値でソート（キーは文字列ID）
     sorted_data = sorted(
         server_data.items(),
         key=lambda item: (
@@ -90,25 +101,29 @@ async def show(ctx):
         reverse=True
     )
 
+    name_width = 20  # 表示名の見た目幅（日本語含む想定）
+
     msg = (
         "```\n=== 登録済みメンバー一覧（能力値合計が高い順） ===\n"
-        f"{'Total':>5} | {'Name':<20} | {'Top':>3} {'Jg':>3} {'Mid':>3} {'Adc':>3} {'Sup':>3}\n"
-        + "-" * 60 + "\n"
+        f"{'Total':>5} | {'Name':<{name_width}} | {'Top':>3} {'Jg':>3} {'Mid':>3} {'Adc':>3} {'Sup':>3}\n"
+        + "-" * (10 + name_width + 20) + "\n"
     )
 
     for uid_str, values in sorted_data:
-        uid = int(uid_str)  # 🔧 文字列から整数に変換！
+        uid = int(uid_str)
         member = ctx.guild.get_member(uid)
         name = member.display_name if member else "不明なユーザー"
+        padded_name = pad_display_name(name, name_width)
 
         total = values['top'] + values['jg'] + values['mid'] + values['adc'] + values['sup']
         msg += (
-            f"{total:>5} | {name:<20} | "
+            f"{total:>5} | {padded_name} | "
             f"{values['top']:>3} {values['jg']:>3} {values['mid']:>3} {values['adc']:>3} {values['sup']:>3}\n"
         )
 
     msg += "```"
     await ctx.send(msg)
+
 
 
 
