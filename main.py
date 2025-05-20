@@ -5,8 +5,8 @@ import json
 import os
 from flask import Flask
 from threading import Thread
-from tabulate import tabulate
 import unicodedata
+from tabulate import tabulate
 
 
 intents = discord.Intents.default()
@@ -76,6 +76,18 @@ async def delete_ability(ctx, member: discord.Member):
 
 
 
+
+
+def get_display_width(text):
+    """文字列の見た目の幅を取得（全角2、半角1としてカウント）"""
+    return sum(2 if unicodedata.east_asian_width(c) in 'WF' else 1 for c in text)
+
+def pad_display_name(name, target_width):
+    """指定幅に合わせて空白を追加"""
+    current_width = get_display_width(name)
+    padding = target_width - current_width
+    return name + ' ' * max(0, padding)
+
 @bot.command()
 async def show(ctx):
     if not active:
@@ -86,6 +98,7 @@ async def show(ctx):
         await ctx.send("データがありません。")
         return
 
+    # 合計値でソート
     sorted_data = sorted(
         server_data.items(),
         key=lambda item: (
@@ -94,20 +107,27 @@ async def show(ctx):
         reverse=True
     )
 
+    # 表の作成
     table = []
+    name_column_width = 16  # 表示名の目標幅（全角換算）
+
     for uid_str, values in sorted_data:
         uid = int(uid_str)
         member = ctx.guild.get_member(uid)
-        name = member.display_name if member else "不明なユーザー"
+        raw_name = member.display_name if member else "不明なユーザー"
+        name = pad_display_name(raw_name, name_column_width)
+
         total = values['top'] + values['jg'] + values['mid'] + values['adc'] + values['sup']
         table.append([
-            total, name, values['top'], values['jg'],
-            values['mid'], values['adc'], values['sup']
+            f"{total:>5}", name,
+            f"{values['top']:>3}", f"{values['jg']:>3}", f"{values['mid']:>4}",
+            f"{values['adc']:>4}", f"{values['sup']:>4}"
         ])
 
     headers = ["Total", "Name", "Top", "Jg", "Mid", "Adc", "Sup"]
     msg = "```\n" + tabulate(table, headers=headers, tablefmt="plain") + "\n```"
     await ctx.send(msg)
+
 
 
 
