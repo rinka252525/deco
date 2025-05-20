@@ -203,6 +203,36 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
     else:
         await ctx.send("⚠ 条件に合うチーム分けが見つかりませんでした。ごめんなさい。")
 
+@bot.command(name="help")
+async def help_command(ctx):
+    help_text = """
+📘 Botコマンド一覧
+
+!hello
+　→ Botが起動しているか確認します。
+
+!bye
+　→ Botを一時停止します。
+
+!ability @ユーザー Top Jg Mid Adc Sup
+　→ 指定したユーザーの能力値を登録または更新します。
+　例: !ability @deco 20 15 30 25 10
+
+!delete_ability @ユーザー
+　→ 指定したユーザーの能力値を削除します。
+
+!show
+　→ 登録済みメンバーの能力値を一覧表示します（ソート付き）。
+
+!make_teams [@除外したいユーザー ...]
+　→ VC内の10人を対象にチーム分けを行います。
+　　レーンごとの能力差が20以内、チーム合計が50以内の組み合わせを探します。
+　　11人以上いる場合、除外したいメンバーを指定してください。
+　例: !make_teams @deco
+ """
+    await ctx.send(help_text)
+
+
 # --- Flask Keep Alive ---
 @app.route('/')
 def home():
