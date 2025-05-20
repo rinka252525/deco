@@ -175,7 +175,7 @@ async def win(ctx, team: str):
     await ctx.send("勝敗結果を反映しました！")
 
 @bot.command()
-async def show_result(ctx):
+async def ranking(ctx):
     server_data = get_server_data(ctx.guild.id)
     if not server_data:
         await ctx.send("データが存在しません。")
@@ -213,7 +213,7 @@ async def help_command(ctx):
 !show
 　→ 登録済みメンバーの能力値を一覧表示します（ソート付き）。
 
-!show_result
+!ranking
 　→ 各レーンの現在の能力値を表示します（ランキング形式）。
 
 !make_teams [@除外したいユーザー ...]
