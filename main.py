@@ -79,18 +79,28 @@ async def show(ctx):
     if not server_data:
         await ctx.send("データがありません。")
         return
-    msg = """```
-Top: 100
-Jg: 95
-Mid: 110
-Adc: 90
-Sup: 85
-"""
-    for uid, values in server_data.items():
+
+    # 合計値を含むタプルのリストに変換してソート
+    sorted_data = sorted(
+        server_data.items(),
+        key=lambda item: (
+            item[1]['top'] + item[1]['jg'] + item[1]['mid'] + item[1]['adc'] + item[1]['sup']
+        ),
+        reverse=True
+    )
+
+    msg = "```\n=== 登録済みメンバー一覧（能力値合計が高い順） ===\n"
+    for uid, values in sorted_data:
         total = values['top'] + values['jg'] + values['mid'] + values['adc'] + values['sup']
-        msg += f"{values['mention']} -> top: {values['top']}, jg: {values['jg']}, mid: {values['mid']}, adc: {values['adc']}, sup: {values['sup']} | Total: {total}\n"
+        msg += (
+            f"{values['mention']} -> "
+            f"top: {values['top']}, jg: {values['jg']}, mid: {values['mid']}, "
+            f"adc: {values['adc']}, sup: {values['sup']} | Total: {total}\n"
+        )
     msg += "```"
+
     await ctx.send(msg)
+
 
 
 
