@@ -192,7 +192,7 @@ async def show_result(ctx):
                 msg += f"{member.display_name}: {stats.get(lane, 0)}\n"
     await ctx.send(msg)
 
-@bot.command(name="help")
+@bot.command(name="help_lolgap2")
 async def help_command(ctx):
     help_text = """
 📘 Botコマンド一覧
