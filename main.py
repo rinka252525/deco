@@ -79,7 +79,7 @@ async def show(ctx):
     if not server_data:
         await ctx.send("データがありません。")
         return
-msg = """```
+    msg = """```
 Top: 100
 Jg: 95
 Mid: 110
@@ -91,6 +91,7 @@ Sup: 85
         msg += f"{values['mention']} -> top: {values['top']}, jg: {values['jg']}, mid: {values['mid']}, adc: {values['adc']}, sup: {values['sup']} | Total: {total}\n"
     msg += "```"
     await ctx.send(msg)
+
 
 
 @bot.command()
