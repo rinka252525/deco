@@ -6,6 +6,7 @@ import os
 from flask import Flask
 from threading import Thread
 from tabulate import tabulate
+import unicodedata
 
 
 intents = discord.Intents.default()
@@ -73,7 +74,7 @@ async def delete_ability(ctx, member: discord.Member):
     else:
         await ctx.send(f"{member.mention} のデータは存在しません。")
 
-import unicodedata
+
 
 def get_display_width(text):
     """文字列の見た目の幅を取得（全角2、半角1としてカウント）"""
