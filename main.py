@@ -85,12 +85,13 @@ Jg: 95
 Mid: 110
 Adc: 90
 Sup: 85
-```"""
+"""
 for uid, values in server_data.items():
-        total = values['top'] + values['jg'] + values['mid'] + values['adc'] + values['sup']
-        msg += f"{values['mention']} -> top: {values['top']}, jg: {values['jg']}, mid: {values['mid']}, adc: {values['adc']}, sup: {values['sup']} | Total: {total}\n"
-    msg += "```"
-    await ctx.send(msg)
+    total = values['top'] + values['jg'] + values['mid'] + values['adc'] + values['sup']
+    msg += f"{values['mention']} -> top: {values['top']}, jg: {values['jg']}, mid: {values['mid']}, adc: {values['adc']}, sup: {values['sup']} | Total: {total}\n"
+msg += "```"
+await ctx.send(msg)
+
 
 @bot.command()
 async def make_teams(ctx, exclude: commands.Greedy[discord.Member] = None):
