@@ -45,13 +45,13 @@ def set_server_data(guild_id, server_data):
 async def hello(ctx):
     global active
     active = True
-    await ctx.send("Botが起動しました！")
+    await ctx.send("Botが起動しました！おはよ～")
 
 @bot.command()
 async def bye(ctx):
     global active
     active = False
-    await ctx.send("Botが休止しました！")
+    await ctx.send("Botが休止しました！おやすみ～")
 
 @bot.command()
 async def ability(ctx, member: discord.Member, top: int, jg: int, mid: int, adc: int, sup: int):
@@ -72,7 +72,7 @@ async def delete_ability(ctx, member: discord.Member):
         set_server_data(ctx.guild.id, server_data)
         await ctx.send(f"{member.mention} の能力値を削除しました。")
     else:
-        await ctx.send(f"{member.mention} のデータは存在しません。")
+        await ctx.send(f"{member.mention} のデータは存在しません；；")
 
 
 
@@ -145,7 +145,7 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
 
     voice_state = ctx.author.voice
     if not voice_state or not voice_state.channel:
-        await ctx.send("VCに参加している必要があります。")
+        await ctx.send("VCに人が足りませんよ！")
         return
 
     channel = voice_state.channel
@@ -165,7 +165,7 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
         if str(m.id) in server_data:
             player_data.append((m, server_data[str(m.id)]))
         else:
-            await ctx.send(f"{m.mention} の能力値が未登録です。")
+            await ctx.send(f"{m.mention} の能力値が未登録です！!ability で登録できますよ！")
             return
 
     from itertools import permutations
@@ -201,7 +201,7 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
             msg += f"{lanes[i]}: {team2[i][0].mention} ({team2[i][1][lanes[i]]})\n"
         await ctx.send(msg)
     else:
-        await ctx.send("⚠ 条件に合うチーム分けが見つかりませんでした。")
+        await ctx.send("⚠ 条件に合うチーム分けが見つかりませんでした。ごめんなさい。")
 
 # --- Flask Keep Alive ---
 @app.route('/')
