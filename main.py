@@ -76,16 +76,6 @@ async def delete_ability(ctx, member: discord.Member):
 
 
 
-def get_display_width(text):
-    """文字列の見た目の幅を取得（全角2、半角1としてカウント）"""
-    return sum(2 if unicodedata.east_asian_width(c) in 'WF' else 1 for c in text)
-
-def pad_display_name(name, width):
-    """指定幅に合わせてパディング"""
-    current_width = get_display_width(name)
-    padding = width - current_width
-    return name + ' ' * padding
-
 @bot.command()
 async def show(ctx):
     if not active:
@@ -96,7 +86,6 @@ async def show(ctx):
         await ctx.send("データがありません。")
         return
 
-    # 合計値でソート
     sorted_data = sorted(
         server_data.items(),
         key=lambda item: (
@@ -119,6 +108,7 @@ async def show(ctx):
     headers = ["Total", "Name", "Top", "Jg", "Mid", "Adc", "Sup"]
     msg = "```\n" + tabulate(table, headers=headers, tablefmt="plain") + "\n```"
     await ctx.send(msg)
+
 
 
 
