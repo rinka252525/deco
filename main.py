@@ -80,7 +80,7 @@ async def show(ctx):
         await ctx.send("データがありません。")
         return
 
-    # 合計値を含むタプルのリストに変換してソート
+    # 合計値を計算してソート
     sorted_data = sorted(
         server_data.items(),
         key=lambda item: (
@@ -89,17 +89,24 @@ async def show(ctx):
         reverse=True
     )
 
-    msg = "```\n=== 登録済みメンバー一覧（能力値合計が高い順） ===\n"
+    # ヘッダー
+    msg = (
+        "```\n=== 登録済みメンバー一覧（能力値合計が高い順） ===\n"
+        f"{'Total':>5} | {'User':<20} | {'Top':>3} {'Jg':>3} {'Mid':>3} {'Adc':>3} {'Sup':>3}\n"
+        + "-" * 60 + "\n"
+    )
+
+    # 各行を追加
     for uid, values in sorted_data:
         total = values['top'] + values['jg'] + values['mid'] + values['adc'] + values['sup']
         msg += (
-            f"{values['mention']} -> "
-            f"top: {values['top']}, jg: {values['jg']}, mid: {values['mid']}, "
-            f"adc: {values['adc']}, sup: {values['sup']} | Total: {total}\n"
+            f"{total:>5} | {values['mention']:<20} | "
+            f"{values['top']:>3} {values['jg']:>3} {values['mid']:>3} {values['adc']:>3} {values['sup']:>3}\n"
         )
-    msg += "```"
 
+    msg += "```"
     await ctx.send(msg)
+
 
 
 
