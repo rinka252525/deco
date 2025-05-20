@@ -79,7 +79,14 @@ async def show(ctx):
     if not server_data:
         await ctx.send("データがありません。")
         return
-    msg = "```
+msg = """```
+Top: 100
+Jg: 95
+Mid: 110
+Adc: 90
+Sup: 85
+```"""
+
 "  
     for uid, values in server_data.items():
         total = values['top'] + values['jg'] + values['mid'] + values['adc'] + values['sup']
