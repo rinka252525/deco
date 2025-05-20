@@ -81,7 +81,7 @@ async def show(ctx):
         await ctx.send("データがありません。")
         return
 
-    # 合計値でソート
+    # 合計値でソート（キーは文字列ID）
     sorted_data = sorted(
         server_data.items(),
         key=lambda item: (
@@ -90,16 +90,15 @@ async def show(ctx):
         reverse=True
     )
 
-    # ヘッダー作成
     msg = (
         "```\n=== 登録済みメンバー一覧（能力値合計が高い順） ===\n"
         f"{'Total':>5} | {'Name':<20} | {'Top':>3} {'Jg':>3} {'Mid':>3} {'Adc':>3} {'Sup':>3}\n"
         + "-" * 60 + "\n"
     )
 
-    # 各ユーザーの情報を行として追加
-    for uid, values in sorted_data:
-        member = ctx.guild.get_member(uid)  # サーバー内メンバー情報を取得
+    for uid_str, values in sorted_data:
+        uid = int(uid_str)  # 🔧 文字列から整数に変換！
+        member = ctx.guild.get_member(uid)
         name = member.display_name if member else "不明なユーザー"
 
         total = values['top'] + values['jg'] + values['mid'] + values['adc'] + values['sup']
@@ -110,6 +109,7 @@ async def show(ctx):
 
     msg += "```"
     await ctx.send(msg)
+
 
 
 
