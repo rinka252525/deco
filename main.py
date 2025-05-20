@@ -139,20 +139,24 @@ async def show(ctx):
 
 
 @bot.command()
-async def make_teams(ctx, exclude: commands.Greedy[discord.Member] = None):
+async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
     if not active:
         return
+
     voice_state = ctx.author.voice
     if not voice_state or not voice_state.channel:
         await ctx.send("VCに参加している必要があります。")
         return
+
     channel = voice_state.channel
-    members = [m for m in channel.members if not m.bot and (exclude is None or m not in exclude)]
+    # 除外指定がある場合、そのメンバーを除外
+    members = [m for m in channel.members if not m.bot and m not in exclude]
 
     if len(members) < 10:
-        await ctx.send("VC内に十分なプレイヤーがいません。")
+        await ctx.send("VC内に十分なプレイヤーがいません。（除外後）")
         return
 
+    # VC内から10人を選ぶ（ランダムでもいいが、先頭10人を選んでいる）
     selected = members[:10]
     server_data = get_server_data(ctx.guild.id)
 
@@ -189,15 +193,15 @@ async def make_teams(ctx, exclude: commands.Greedy[discord.Member] = None):
     if result:
         team1, team2 = result
         lanes = ['top', 'jg', 'mid', 'adc', 'sup']
-        msg = "**Team A**\n"
+        msg = "**✅ Team A**\n"
         for i in range(5):
             msg += f"{lanes[i]}: {team1[i][0].mention} ({team1[i][1][lanes[i]]})\n"
-        msg += "\n**Team B**\n"
+        msg += "\n**✅ Team B**\n"
         for i in range(5):
             msg += f"{lanes[i]}: {team2[i][0].mention} ({team2[i][1][lanes[i]]})\n"
         await ctx.send(msg)
     else:
-        await ctx.send("条件に合うチーム分けが見つかりませんでした。")
+        await ctx.send("⚠ 条件に合うチーム分けが見つかりませんでした。")
 
 # --- Flask Keep Alive ---
 @app.route('/')
