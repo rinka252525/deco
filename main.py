@@ -203,7 +203,7 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
     else:
         await ctx.send("⚠ 条件に合うチーム分けが見つかりませんでした。ごめんなさい。")
 
-@bot.command(name="help")
+@bot.command(name="help_lolgap2")
 async def help_command(ctx):
     help_text = """
 📘 Botコマンド一覧
