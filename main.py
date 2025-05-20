@@ -280,7 +280,7 @@ async def help_command(ctx):
 　例: !make_teams @deco
  
  !win A/B
-  →能力値を勝ったチーム+2、負けたチームは-2されます。
+  →能力値が勝ったチーム+2、負けたチームは-2されます。
  """
     await ctx.send(help_text)
 
