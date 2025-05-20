@@ -5,6 +5,8 @@ import json
 import os
 from flask import Flask
 from threading import Thread
+from tabulate import tabulate
+
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -93,6 +95,7 @@ async def show(ctx):
         await ctx.send("データがありません。")
         return
 
+    # 合計値でソート
     sorted_data = sorted(
         server_data.items(),
         key=lambda item: (
@@ -101,27 +104,19 @@ async def show(ctx):
         reverse=True
     )
 
-    name_width = 20  # 表示名の見た目幅（日本語含む想定）
-
-    msg = (
-        "```\n=== 登録済みメンバー一覧（能力値合計が高い順） ===\n"
-        f"{'Total':>5} | {'Name':<{name_width}} | {'Top':>3} {'Jg':>3} {'Mid':>3} {'Adc':>3} {'Sup':>3}\n"
-        + "-" * (10 + name_width + 20) + "\n"
-    )
-
+    table = []
     for uid_str, values in sorted_data:
         uid = int(uid_str)
         member = ctx.guild.get_member(uid)
         name = member.display_name if member else "不明なユーザー"
-        padded_name = pad_display_name(name, name_width)
-
         total = values['top'] + values['jg'] + values['mid'] + values['adc'] + values['sup']
-        msg += (
-            f"{total:>5} | {padded_name} | "
-            f"{values['top']:>3} {values['jg']:>3} {values['mid']:>3} {values['adc']:>3} {values['sup']:>3}\n"
-        )
+        table.append([
+            total, name, values['top'], values['jg'],
+            values['mid'], values['adc'], values['sup']
+        ])
 
-    msg += "```"
+    headers = ["Total", "Name", "Top", "Jg", "Mid", "Adc", "Sup"]
+    msg = "```\n" + tabulate(table, headers=headers, tablefmt="plain") + "\n```"
     await ctx.send(msg)
 
 
