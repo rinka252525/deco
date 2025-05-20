@@ -75,12 +75,13 @@ async def delete_ability(ctx, member: discord.Member):
 async def show(ctx):
     if not active:
         return
+
     server_data = get_server_data(ctx.guild.id)
     if not server_data:
         await ctx.send("データがありません。")
         return
 
-    # 合計値を計算してソート
+    # 合計値でソート
     sorted_data = sorted(
         server_data.items(),
         key=lambda item: (
@@ -89,23 +90,27 @@ async def show(ctx):
         reverse=True
     )
 
-    # ヘッダー
+    # ヘッダー作成
     msg = (
         "```\n=== 登録済みメンバー一覧（能力値合計が高い順） ===\n"
-        f"{'Total':>5} | {'User':<20} | {'Top':>3} {'Jg':>3} {'Mid':>3} {'Adc':>3} {'Sup':>3}\n"
+        f"{'Total':>5} | {'Name':<20} | {'Top':>3} {'Jg':>3} {'Mid':>3} {'Adc':>3} {'Sup':>3}\n"
         + "-" * 60 + "\n"
     )
 
-    # 各行を追加
+    # 各ユーザーの情報を行として追加
     for uid, values in sorted_data:
+        user = await bot.fetch_user(uid)  # ユーザーオブジェクトを取得（非同期）
+        name = user.display_name if hasattr(user, 'display_name') else user.name  # 表示名を取得
+
         total = values['top'] + values['jg'] + values['mid'] + values['adc'] + values['sup']
         msg += (
-            f"{total:>5} | {values['mention']:<20} | "
+            f"{total:>5} | {name:<20} | "
             f"{values['top']:>3} {values['jg']:>3} {values['mid']:>3} {values['adc']:>3} {values['sup']:>3}\n"
         )
 
     msg += "```"
     await ctx.send(msg)
+
 
 
 
