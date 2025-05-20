@@ -19,6 +19,9 @@ app = Flask('')
 
 active = True
 DATA_FILE = 'ability_data.json'
+# ファイルの先頭付近に追加（グローバル変数）
+last_teams = {}  # guild_id をキーにしてチーム情報を保存
+
 
 # --- Utility Functions ---
 def load_data():
@@ -187,6 +190,14 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
             sum2 = sum(v[1][lanes[i]] for i, v in enumerate(team2))
             if abs(sum1 - sum2) <= 50:
                 return team1, team2
+                    if result:
+        team1, team2 = result
+
+        # チームデータ保存（勝敗更新用）
+        last_teams[ctx.guild.id] = {
+            'team1': team1,
+            'team2': team2
+        }
         return None
 
     result = valid_teams(player_data)
@@ -202,6 +213,43 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
         await ctx.send(msg)
     else:
         await ctx.send("⚠ 条件に合うチーム分けが見つかりませんでした。ごめんなさい。")
+
+@bot.command()
+async def win(ctx, team: str):
+    if not active:
+        return
+
+    if ctx.guild.id not in last_teams:
+        await ctx.send("直前のチーム分けデータがありません。まず !make_teams を実行してください。")
+        return
+
+    if team not in ['A', 'B']:
+        await ctx.send("勝ったチームは 'A' または 'B' で指定してください。例: `!win A`")
+        return
+
+    server_data = get_server_data(ctx.guild.id)
+    teams = last_teams[ctx.guild.id]
+    lanes = ['top', 'jg', 'mid', 'adc', 'sup']
+
+    win_team = teams['team1'] if team == 'A' else teams['team2']
+    lose_team = teams['team2'] if team == 'A' else teams['team1']
+
+    for i in range(5):
+        lane = lanes[i]
+
+        # 勝者の能力値 +2（最大120）
+        win_member = win_team[i][0]
+        win_uid = str(win_member.id)
+        server_data[win_uid][lane] = min(server_data[win_uid][lane] + 2, 120)
+
+        # 敗者の能力値 -2（最小0）
+        lose_member = lose_team[i][0]
+        lose_uid = str(lose_member.id)
+        server_data[lose_uid][lane] = max(server_data[lose_uid][lane] - 2, 0)
+
+    set_server_data(ctx.guild.id, server_data)
+    await ctx.send(f"✅ Team {team} の勝利を記録しました！能力値を更新しました。")
+
 
 @bot.command(name="help_lolgap2")
 async def help_command(ctx):
@@ -229,6 +277,9 @@ async def help_command(ctx):
 　　レーンごとの能力差が20以内、チーム合計が50以内の組み合わせを探します。
 　　11人以上いる場合、除外したいメンバーを指定してください。
 　例: !make_teams @deco
+ 
+ !win A/B
+  →能力値を勝ったチーム+2、負けたチームは-2されます。
  """
     await ctx.send(help_text)
 
