@@ -85,9 +85,14 @@ async def bye(ctx):
 # 能力登録
 @bot.command()
 async def ability(ctx, member: discord.Member, top: int, jg: int, mid: int, adc: int, sup: int):
+    guild_id = str(ctx.guild.id)
     data = load_data(ability_file)
+
+    if guild_id not in data:
+        data[guild_id] = {}
+
     user_id = str(member.id)
-    data[user_id] = {
+    data[guild_id][user_id] = {
         'name': member.name,
         'top': top,
         'jg': jg,
@@ -95,8 +100,10 @@ async def ability(ctx, member: discord.Member, top: int, jg: int, mid: int, adc:
         'adc': adc,
         'sup': sup
     }
+
     save_data(ability_file, data)
     await ctx.send(f"{member.mention} の能力値を登録しました。")
+
 
 
 @bot.command()
