@@ -76,23 +76,31 @@ async def show(ctx):
     await ctx.send(msg)
 
 @bot.command()
-async def join(ctx, *lanes):
+async def join(ctx, *args):
     gid = ctx.guild.id
     if gid not in participants:
         participants[gid] = {}
-    
+
+    mentioned = ctx.message.mentions  # メンションされたメンバー一覧
+    lanes = [a.lower() for a in args if a.lower() not in [m.mention for m in mentioned]]
+
+    if not mentioned:
+        mentioned = [ctx.author]
+
     if not lanes:
-        await ctx.send("希望レーンを2つ、または`fill`を指定してください（例：`!join top jg` または `!join fill`）")
+        await ctx.send("希望レーンを2つ指定してください。例: `!join @user1 top mid` または `!join fill`")
         return
 
-    if lanes[0].lower() == 'fill':
-        participants[gid][ctx.author.id] = ['fill']
-        await ctx.send(f"{ctx.author.display_name} をどのレーンでもOKとして登録しました。")
-    elif len(lanes) == 2 and all(lane in ['top', 'jg', 'mid', 'adc', 'sup'] for lane in lanes):
-        participants[gid][ctx.author.id] = list(lanes)
-        await ctx.send(f"{ctx.author.display_name} を希望レーン {lanes[0]}, {lanes[1]} として登録しました。")
-    else:
-        await ctx.send("正しいレーンを2つ指定してください（top, jg, mid, adc, sup）")
+    for user in mentioned:
+        if len(lanes) == 1 and lanes[0] == "fill":
+            participants[gid][user.id] = ["fill"]
+            await ctx.send(f"{user.display_name} を fill で参加登録しました。")
+        elif len(lanes) == 2:
+            participants[gid][user.id] = lanes
+            await ctx.send(f"{user.display_name} を {lanes[0]} と {lanes[1]} 希望で参加登録しました。")
+        else:
+            await ctx.send(f"{user.display_name} の登録に失敗しました。レーンは2つ、または 'fill' を指定してください。")
+
 
 @bot.command()
 async def leave(ctx, member: discord.Member = None):
@@ -105,13 +113,31 @@ async def leave(ctx, member: discord.Member = None):
         await ctx.send("そのユーザーは登録されていません。")
 
 @bot.command()
+async def participants_list(ctx):
+    gid = ctx.guild.id
+    if gid not in participants or not participants[gid]:
+        await ctx.send("現在、参加者は登録されていません。")
+        return
+
+    lines = []
+    for user_id, lanes in participants[gid].items():
+        member = ctx.guild.get_member(user_id)
+        name = member.display_name if member else f"Unknown({user_id})"
+        lane_info = ", ".join(lanes)
+        lines.append(f"**{name}**：{lane_info}")
+
+    msg = "\n".join(lines)
+    await ctx.send(f"**現在の参加者一覧：**\n{msg}")
+
+
+@bot.command()
 async def make_teams(ctx, *, args=None):
     gid = ctx.guild.id
     if gid not in participants or len(participants[gid]) < 10:
         await ctx.send("十分な参加者がいません（最低10人必要）")
         return
 
-    lane_threshold = 40
+    lane_threshold = 20
     team_threshold = 50
 
     if args:
@@ -243,7 +269,7 @@ async def help_command(ctx):
 !join top mid / !join fill - レーン希望で参加（2つまで or fill）
 !leave @user - 参加リストから削除
 !reset - 参加者すべて削除
-!make_teams lane_diff=20 team_diff=50 - チーム分け（VC不要・参加者10人）
+!make_teams lane_diff=40 team_diff=50 - チーム分け（VC不要・参加者10人）
 !ability @user 10 10 10 10 10 - 能力値登録
 !delete_ability @user - 能力値削除
 !show - 能力一覧
