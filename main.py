@@ -66,13 +66,13 @@ def save_json(filename, data):
         json.dump(data, f, indent=4)
 
 def get_server_data(guild_id):
-    data = load_data()
+    data = load_data(ability_file)
     return data.setdefault(str(guild_id), {})
 
 def update_server_data(guild_id, server_data):
-    data = load_data()
+    data = load_data(ability_file)
     data[str(guild_id)] = server_data
-    save_data(data)
+    save_data(ability_file, data)
 
 
 @bot.command()
