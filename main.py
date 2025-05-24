@@ -95,12 +95,19 @@ async def bye(ctx):
 
 # 能力登録
 @bot.command()
-async def ability(ctx, top: int, jg: int, mid: int, adc: int, sup: int):
+async def ability(ctx, member: discord.Member, top: int, jg: int, mid: int, adc: int, sup: int):
     data = load_data(ability_file)
-    user_id = str(ctx.author.id)
-    data[user_id] = {'name': ctx.author.name, 'top': top, 'jg': jg, 'mid': mid, 'adc': adc, 'sup': sup}
+    user_id = str(member.id)
+    data[user_id] = {
+        'name': member.name,
+        'top': top,
+        'jg': jg,
+        'mid': mid,
+        'adc': adc,
+        'sup': sup
+    }
     save_data(ability_file, data)
-    await ctx.send(f"{ctx.author.name} の能力値を登録しました。")
+    await ctx.send(f"{member.mention} の能力値を登録しました。")
 
 
 @bot.command()
