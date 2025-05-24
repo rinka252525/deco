@@ -16,7 +16,6 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
-DATA_FILE = "abilities.json"
 ability_file = 'abilities.json'
 team_file = 'last_teams.json'
 match_history_file = 'match_history.json'
