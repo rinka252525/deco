@@ -13,7 +13,26 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+lanes = ['top', 'jg', 'mid', 'adc', 'sup']
+
+# JSON読み書き関数
+def load_json(filename):
+    if os.path.exists(filename):
+        with open(filename, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_json(filename, data):
+    with open(filename, 'w') as f:
+        json.dump(data, f, indent=4)
+
+
+
+
 DATA_FILE = "abilities.json"
+ability_file = 'abilities.json'
+team_file = 'last_teams.json'
+match_history_file = 'match_history.json'
 participants = {}  # {guild_id: {user_id: [lane1, lane2]}} または ['fill']
 last_teams = {}
 # Ability data structure example:
@@ -33,6 +52,18 @@ last_teams = {}
 #       }
 #   }
 # }
+lanes = ['top', 'jg', 'mid', 'adc', 'sup']
+
+# JSON読み書き関数
+def load_json(filename):
+    if os.path.exists(filename):
+        with open(filename, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_json(filename, data):
+    with open(filename, 'w') as f:
+        json.dump(data, f, indent=4)
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -62,12 +93,13 @@ async def hello(ctx):
 async def bye(ctx):
     await ctx.send("Botを一時停止します。")
 
+# !ability name top jg mid adc sup
 @bot.command()
-async def ability(ctx, member: discord.Member, top: int, jg: int, mid: int, adc: int, sup: int):
-    server_data = get_server_data(ctx.guild.id)
-    server_data[str(member.id)] = {"top": top, "jg": jg, "mid": mid, "adc": adc, "sup": sup}
-    update_server_data(ctx.guild.id, server_data)
-    await ctx.send(f"{member.display_name} の能力値を登録しました。")
+async def ability(ctx, name: str, top: int, jg: int, mid: int, adc: int, sup: int):
+    abilities = load_json(ability_file)
+    abilities[name] = {'top': top, 'jg': jg, 'mid': mid, 'adc': adc, 'sup': sup}
+    save_json(ability_file, abilities)
+    await ctx.send(f"{name}の能力値を登録しました。")
 
 @bot.command()
 async def delete_ability(ctx, member: discord.Member):
@@ -79,22 +111,31 @@ async def delete_ability(ctx, member: discord.Member):
     else:
         await ctx.send("そのユーザーのデータは存在しません。")
 
+# !show
 @bot.command()
 async def show(ctx):
-    lanes = ['top', 'jg', 'mid', 'adc', 'sup']  # ここを追加
-    server_data = get_server_data(ctx.guild.id)
-    if not server_data:
-        await ctx.send("登録されているデータがありません。")
+    abilities = load_json(ability_file)
+    if not abilities:
+        await ctx.send("登録されたデータがありません。")
         return
+    sorted_data = sorted(abilities.items(), key=lambda x: sum(x[1].values()), reverse=True)
+    result = "**登録済み能力値一覧（合計順）**\n"
+    for name, scores in sorted_data:
+        total = sum(scores.values())
+        result += f"{name}: {scores} 合計: {total}\n"
+    await ctx.send(result)
 
-    msg = "**登録された能力値一覧**\n"
-    for uid, stats in server_data.items():
-        member = ctx.guild.get_member(int(uid))
-        if not member:
-            continue
-        total = sum(stats.get(role, 0) for role in lanes)
-        msg += f"{member.display_name}: Top {stats['top']}, Jg {stats['jg']}, Mid {stats['mid']}, Adc {stats['adc']}, Sup {stats['sup']} | 合計: {total}\n"
-    await ctx.send(msg)
+# チーム分けユーティリティ
+def calculate_total(team):
+    return sum(sum(p[1].values()) for p in team)
+
+def format_teams(team_a, team_b):
+    def fmt(team):
+        return '\n'.join([f"{name} ({' / '.join([f'{lane}:{score}' for lane, score in stats.items()])})" for name, stats in team])
+    total_a = calculate_total(team_a)
+    total_b = calculate_total(team_b)
+    return f"**Team A** (Total: {total_a})\n{fmt(team_a)}\n\n**Team B** (Total: {total_b})\n{fmt(team_b)}"
+
 
 
 @bot.command()
@@ -336,97 +377,64 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 
 
 
+# !swap @user1 @user2
 @bot.command()
 async def swap(ctx, member1: discord.Member, member2: discord.Member):
-    with open("current_teams.json", "r") as f:
-        teams = json.load(f)
-
-    # 該当プレイヤーのレーンを特定
-    lane1 = lane2 = team1 = team2 = None
-    for team_name, lanes in teams.items():
-        for lane, player in lanes.items():
-            if player == str(member1):
-                lane1, team1 = lane, team_name
-            if player == str(member2):
-                lane2, team2 = lane, team_name
-
-    if lane1 is None or lane2 is None:
-        await ctx.send("指定したメンバーがチームに存在しません。")
+    last_teams = load_json(team_file)
+    if not last_teams:
+        await ctx.send("直近のチームが存在しません。")
         return
+    name1 = member1.name
+    name2 = member2.name
+    all_players = last_teams['A'] + last_teams['B']
+    if name1 not in all_players or name2 not in all_players:
+        await ctx.send("指定したメンバーがチームにいません。")
+        return
+    for team in ['A', 'B']:
+        if name1 in last_teams[team]:
+            last_teams[team].remove(name1)
+            last_teams[team].append(name2)
+        elif name2 in last_teams[team]:
+            last_teams[team].remove(name2)
+            last_teams[team].append(name1)
+    save_json(team_file, last_teams)
+    abilities = load_json(ability_file)
+    team_a = [(p, abilities[p]) for p in last_teams['A']]
+    team_b = [(p, abilities[p]) for p in last_teams['B']]
+    await ctx.send("入れ替え後のチーム:\n" + format_teams(team_a, team_b))
 
-    # 入れ替え
-    teams[team1][lane1], teams[team2][lane2] = str(member2), str(member1)
-
-    with open("current_teams.json", "w") as f:
-        json.dump(teams, f, indent=2)
-
-    await ctx.send(f"{member1.display_name}（{lane1}）と {member2.display_name}（{lane2}）のレーンを交換しました。")
-
-    # 再表示（必要なら make_teams の表示部分を関数化して呼び出し）
-    await show_team_result(ctx, teams)  # ← チーム情報表示関数
-
-
-
+# !win A または !win B
 @bot.command()
-async def win(ctx, winner_team: str):
-    if winner_team not in ["teamA", "teamB"]:
-        await ctx.send("勝利チームは 'teamA' か 'teamB' を指定してください。")
+async def win(ctx, winner: str):
+    winner = winner.upper()
+    if winner not in ['A', 'B']:
+        await ctx.send("勝者は A または B で指定してください。")
         return
+    last_teams = load_json(team_file)
+    if not last_teams:
+        await ctx.send("直近のチームが存在しません。")
+        return
+    match_history = load_json(match_history_file)
+    abilities = load_json(ability_file)
 
-    with open("current_teams.json", "r") as f:
-        teams = json.load(f)
-
-    with open("abilities.json", "r") as f:
-        abilities = json.load(f)
-
-    with open("history.json", "r") as f:
-        history = json.load(f)
-
-    loser_team = "teamB" if winner_team == "teamA" else "teamA"
-    changes = {}
-
-    for team_name, team_data in teams.items():
-        is_winner = (team_name == winner_team)
-        for lane, user in team_data.items():
-            user = str(user)
-            if user not in history:
-                history[user] = {
-                    "win": 0, "lose": 0,
-                    "lane_win": {l: 0 for l in ["top", "jg", "mid", "adc", "sup"]},
-                    "lane_lose": {l: 0 for l in ["top", "jg", "mid", "adc", "sup"]}
-                }
-
-            wins = history[user]["win"]
-            losses = history[user]["lose"]
-            total_matches = wins + losses
-
-            delta = 10 if total_matches < 5 else 2
-            change = delta if is_winner else -delta
-
-            if user in abilities and lane in abilities[user]:
-                new_value = max(0, abilities[user][lane] + change)
-                changes[user] = (abilities[user][lane], new_value)
-                abilities[user][lane] = new_value
-
-            # 履歴更新
+    loser = 'B' if winner == 'A' else 'A'
+    for team_key, is_winner in [(winner, True), (loser, False)]:
+        for name in last_teams[team_key]:
+            if name not in match_history:
+                match_history[name] = {'wins': 0, 'losses': 0, 'matches': 0}
+            stats = match_history[name]
+            stats['matches'] += 1
             if is_winner:
-                history[user]["win"] += 1
-                history[user]["lane_win"][lane] += 1
+                stats['wins'] += 1
             else:
-                history[user]["lose"] += 1
-                history[user]["lane_lose"][lane] += 1
-
-    with open("abilities.json", "w") as f:
-        json.dump(abilities, f, indent=2)
-
-    with open("history.json", "w") as f:
-        json.dump(history, f, indent=2)
-
-    msg = f"✅ `{winner_team}` が勝利しました！能力値を更新しました。\n"
-    for user, (before, after) in changes.items():
-        msg += f"- {user}: {before} → {after}\n"
-
-    await ctx.send(msg)
+                stats['losses'] += 1
+            change = 10 if stats['matches'] <= 5 else 2
+            sign = 1 if is_winner else -1
+            for lane in abilities[name]:
+                abilities[name][lane] = max(0, abilities[name][lane] + sign * change)
+    save_json(match_history_file, match_history)
+    save_json(ability_file, abilities)
+    await ctx.send(f"勝者: Team {winner}\n能力値を更新しました。")
 
 
 @bot.command()
