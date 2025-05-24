@@ -38,7 +38,7 @@ async def hello(ctx):
 
 @bot.command()
 async def bye(ctx):
-    await ctx.send("Botを一時停止します（実際には停止しません）。")
+    await ctx.send("Botを一時停止します。")
 
 @bot.command()
 async def ability(ctx, member: discord.Member, top: int, jg: int, mid: int, adc: int, sup: int):
@@ -80,17 +80,37 @@ async def show(ctx):
     await ctx.send(msg)
 
 @bot.command()
-async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
+async def make_teams(ctx, *, args=None):
+    import re
+
     voice_state = ctx.author.voice
     if not voice_state or not voice_state.channel:
         await ctx.send("VCに人が足りませんよ！")
         return
 
+    # デフォルト設定
+    lane_threshold = 20
+    team_threshold = 50
+    exclude_members = []
+
+    # 引数パース
+    if args:
+        # メンション（除外ユーザー）抽出
+        exclude_members = [m for m in ctx.message.mentions]
+
+        # 数値パラメータ抽出
+        lane_match = re.search(r'lane_diff=(\d+)', args)
+        team_match = re.search(r'team_diff=(\d+)', args)
+        if lane_match:
+            lane_threshold = int(lane_match.group(1))
+        if team_match:
+            team_threshold = int(team_match.group(1))
+
     channel = voice_state.channel
-    members = [m for m in channel.members if not m.bot and m not in exclude]
+    members = [m for m in channel.members if not m.bot and m not in exclude_members]
 
     if len(members) < 10:
-        await ctx.send("VC内に十分なプレイヤーがいません。（除外後）")
+        await ctx.send(f"VC内に十分なプレイヤーがいません。（除外後: {len(members)}人）")
         return
 
     selected = members[:10]
@@ -100,8 +120,10 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
         if str(m.id) in server_data:
             player_data.append((m, server_data[str(m.id)]))
         else:
-            await ctx.send(f"{m.mention} の能力値が未登録です！!ability で登録できますよ！")
+            await ctx.send(f"{m.mention} の能力値が未登録です！!ability で登録してください。")
             return
+
+    from itertools import permutations
 
     def valid_teams(data):
         for perm in permutations(data, 10):
@@ -111,14 +133,14 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
             ok = True
             for i in range(5):
                 diff = abs(team1[i][1][lanes[i]] - team2[i][1][lanes[i]])
-                if diff > 20:
+                if diff > lane_threshold:
                     ok = False
                     break
             if not ok:
                 continue
             sum1 = sum(v[1][lanes[i]] for i, v in enumerate(team1))
             sum2 = sum(v[1][lanes[i]] for i, v in enumerate(team2))
-            if abs(sum1 - sum2) <= 50:
+            if abs(sum1 - sum2) <= team_threshold:
                 return team1, team2
         return None
 
@@ -133,15 +155,16 @@ async def make_teams(ctx, *, exclude: commands.Greedy[discord.Member] = []):
         }
 
         lanes = ['top', 'jg', 'mid', 'adc', 'sup']
-        msg = "**✅ Team A**\n"
+        msg = f"**✅ Team A** (各レーン差 ≤ {lane_threshold}, 合計差 ≤ {team_threshold})\n"
         for i in range(5):
             msg += f"{lanes[i]}: {team1[i][0].mention} ({team1[i][1][lanes[i]]})\n"
-        msg += "\n**✅ Team B**\n"
+        msg += f"\n**✅ Team B**\n"
         for i in range(5):
             msg += f"{lanes[i]}: {team2[i][0].mention} ({team2[i][1][lanes[i]]})\n"
         await ctx.send(msg)
     else:
-        await ctx.send("⚠ 条件に合うチーム分けが見つかりませんでした。ごめんなさい。")
+        await ctx.send(f"⚠ 条件に合うチーム分けが見つかりませんでした。\n（lane_diff≤{lane_threshold}, team_diff≤{team_threshold}）")
+
 
 @bot.command()
 async def win(ctx, team: str):
@@ -216,11 +239,12 @@ async def help_command(ctx):
 !ranking
 　→ 各レーンの現在の能力値を表示します（ランキング形式）。
 
-!make_teams [@除外したいユーザー ...]
+!make_teams exclude=@user1 @user2 lane_diff=数値 team_diff=数値
 　→ VC内の10人を対象にチーム分けを行います。
-　　レーンごとの能力差が20以内、チーム合計が50以内の組み合わせを探します。
+　　入力しない場合：レーンごとの能力差が20以内、チーム合計が50以内の組み合わせを探します。
 　　11人以上いる場合、除外したいメンバーを指定してください。
-　例: !make_teams @deco
+  　lane_diffは対面、team_diffはチーム能力合計値の差を示します。
+　例: !make_teams @deco lane_diff=25 team_diff=70
 
 !win A or B
 　→ 勝利チームを指定し、そのレーンの能力値を +2 / -2 で更新します。
