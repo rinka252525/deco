@@ -120,12 +120,23 @@ async def delete_ability(ctx, member: discord.Member):
 @bot.command()
 async def show(ctx):
     data = load_data(ability_file)
-    sorted_data = sorted(data.items(), key=lambda x: sum(x[1][lane] for lane in ['top', 'jg', 'mid', 'adc', 'sup']), reverse=True)
+    guild_id = str(ctx.guild.id)
+    
+    if guild_id not in data or not data[guild_id]:
+        await ctx.send("まだ能力が登録されていません。")
+        return
+
+    sorted_data = sorted(
+        data[guild_id].items(),
+        key=lambda x: sum(x[1][lane] for lane in ['top', 'jg', 'mid', 'adc', 'sup']),
+        reverse=True
+    )
     msg = "**能力一覧（合計順）**\n"
     for user_id, info in sorted_data:
         total = sum(info[lane] for lane in ['top', 'jg', 'mid', 'adc', 'sup'])
         msg += f"<@{user_id}> top{info['top']} jg{info['jg']} mid{info['mid']} adc{info['adc']} sup{info['sup']} | 合計{total}\n"
     await ctx.send(msg)
+
 
 # チーム分けユーティリティ
 def calculate_total(team):
@@ -434,24 +445,46 @@ async def win(ctx, result: str):
     abilities = load_data(ability_file)
     history = load_data(history_file)
 
-    winner = current_teams[result]
-    loser = current_teams['B' if result == 'A' else 'A']
+    # 現在のチーム情報（保存されている前提）
+    current_teams = load_json(team_file)
+    if not current_teams:
+        await ctx.send("直近のチーム情報が見つかりません。")
+        return
 
-    for team, is_win in [(winner, True), (loser, False)]:
-        for lane, player in team.items():
-            user_id = str(player.id)
+    winner_names = current_teams[result]
+    loser_names = current_teams['B' if result == 'A' else 'A']
+
+    for names, is_win in [(winner_names, True), (loser_names, False)]:
+        for name in names:
+            # abilitiesとhistoryはuser_idで保持されている前提
+            user_id = None
+            for uid, info in abilities.items():
+                if info["name"] == name:
+                    user_id = uid
+                    break
+            if user_id is None:
+                continue  # スキップ
+
             if user_id not in history:
                 history[user_id] = {'count': 0}
             history[user_id]['count'] += 1
-            delta = 10 if history[user_id]['count'] <= 5 else 2
-            if user_id in abilities:
-                current_value = abilities[user_id][lane]
-                new_value = current_value + delta if is_win else max(0, current_value - delta)
-                abilities[user_id][lane] = new_value
+            match_count = history[user_id]['count']
+            delta = 10 if match_count <= 5 else 2
+
+            # 各レーンの能力値を更新（登録済みレーンすべて）
+            for lane in ['top', 'jg', 'mid', 'adc', 'sup']:
+                if lane in abilities[user_id]:
+                    current_value = abilities[user_id][lane]
+                    if is_win:
+                        abilities[user_id][lane] = current_value + delta
+                    else:
+                        abilities[user_id][lane] = max(0, current_value - delta)
 
     save_data(ability_file, abilities)
     save_data(history_file, history)
     await ctx.send(f"勝敗を記録しました。能力値を更新しました。")
+
+
 
 
 @bot.command()
