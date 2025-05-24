@@ -151,6 +151,8 @@ async def participants_list(ctx):
 @bot.command()
 async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     guild_id = ctx.guild.id
+    lanes = ['top', 'jg', 'mid', 'adc', 'sup']  # ここで定義
+
     if guild_id not in participants or len(participants[guild_id]) < 10:
         await ctx.send("参加者が10人未満です。")
         return
@@ -173,38 +175,60 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                 role_map = {}
                 assigned = set()
 
+                # team1のメンバーにレーン割り当て
                 for uid, lane in zip(team1_ids, team1_roles):
                     role_map[uid] = lane
                     assigned.add(lane)
 
-                remaining = set(lanes)
+                remaining = set(lanes) - assigned
+
+                # team2のメンバーにレーン割り当て
                 for uid in team2_ids:
                     prefs = participants[guild_id].get(uid, [])
+                    if not prefs:
+                        prefs = ['fill']
                     assigned_lane = None
-                    for p in prefs:
-                        if p in remaining:
-                            assigned_lane = p
-                            break
-                    if not assigned_lane:
-                        unassigned = list(remaining)
-                        if not unassigned:
-                            break
-                        assigned_lane = random.choice(unassigned)
+                    if 'fill' in prefs:
+                        if remaining:
+                            assigned_lane = random.choice(list(remaining))
+                        else:
+                            assigned_lane = random.choice(lanes)
+                    else:
+                        for p in prefs:
+                            if p in remaining:
+                                assigned_lane = p
+                                break
+                        if assigned_lane is None:
+                            if remaining:
+                                assigned_lane = random.choice(list(remaining))
+                            else:
+                                assigned_lane = random.choice(lanes)
+
                     role_map[uid] = assigned_lane
                     remaining.discard(assigned_lane)
 
                 if len(role_map) != 10:
                     continue
 
-                team1_score = team2_score = 0
+                team1_score = 0
+                team2_score = 0
                 total_lane_diff = 0
                 exceeded = False
 
                 for lane in lanes:
-                    uid1 = [u for u in team1_ids if role_map[u] == lane][0]
-                    uid2 = [u for u in team2_ids if role_map[u] == lane][0]
+                    uid1 = [u for u in team1_ids if role_map[u] == lane]
+                    uid2 = [u for u in team2_ids if role_map[u] == lane]
+
+                    if not uid1 or not uid2:
+                        exceeded = True
+                        break
+
+                    uid1 = uid1[0]
+                    uid2 = uid2[0]
+
                     val1 = server_data[str(uid1)][lane]
                     val2 = server_data[str(uid2)][lane]
+
                     team1_score += val1
                     team2_score += val2
                     diff = abs(val1 - val2)
@@ -212,9 +236,14 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                     if diff > lane_diff:
                         exceeded = True
 
-                team_diff_value = abs(team1_score - team2_score)
-                if team_diff_value > team_diff:
-                    exceeded = True
+                if exceeded:
+                    team_diff_value = abs(team1_score - team2_score)
+                    if team_diff_value > team_diff:
+                        exceeded = True
+                else:
+                    team_diff_value = abs(team1_score - team2_score)
+                    if team_diff_value > team_diff:
+                        exceeded = True
 
                 score = total_lane_diff + team_diff_value
                 if exceeded:
@@ -235,7 +264,9 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                                 warnings.append(f"{lane} の能力差が {diff} あります。")
                         if team_diff_value > team_diff:
                             warnings.append(f"チーム合計の能力差が {team_diff_value} あります。")
-            except:
+
+            except Exception as e:
+                print(f"make_teams exception: {e}")
                 continue
 
     if not best_result:
@@ -244,8 +275,8 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 
     t1, t2, role_map = best_result
     last_teams[guild_id] = {
-        "team1": [(ctx.guild.get_member(uid), role_map[uid]) for uid in t1],
-        "team2": [(ctx.guild.get_member(uid), role_map[uid]) for uid in t2],
+        "team1": [(ctx.guild.get_member(uid) or f"Unknown User {uid}", role_map[uid]) for uid in t1],
+        "team2": [(ctx.guild.get_member(uid) or f"Unknown User {uid}", role_map[uid]) for uid in t2],
     }
 
     msg = ""
@@ -255,13 +286,20 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 
     msg += "\n**Team A**\n"
     for m, lane in last_teams[guild_id]["team1"]:
-        msg += f"{m.display_name}（{lane}）\n"
+        if isinstance(m, discord.Member):
+            msg += f"{m.display_name}（{lane}）\n"
+        else:
+            msg += f"{m}（{lane}）\n"
 
     msg += "\n**Team B**\n"
     for m, lane in last_teams[guild_id]["team2"]:
-        msg += f"{m.display_name}（{lane}）\n"
+        if isinstance(m, discord.Member):
+            msg += f"{m.display_name}（{lane}）\n"
+        else:
+            msg += f"{m}（{lane}）\n"
 
     await ctx.send(msg)
+
 
 
 
