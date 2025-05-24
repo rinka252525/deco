@@ -347,28 +347,30 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     team1_score = calc_team_score(team1_sorted)
     team2_score = calc_team_score(team2_sorted)
 
-    msg = ""
-    if warnings:
-        msg += "⚠️ 条件を満たす編成が見つかりませんでした。できるだけ近い組み合わせを表示します。\n"
-        msg += "\n".join(warnings) + "\n"
+    msg = "**チーム分け結果**\n"
 
-    msg += "\n**Team A (合計能力値: {})**\n".format(team1_score)
+    msg += f"\n**Team A**（合計スコア: {team1_score}）\n"
     for m, lane in team1_sorted:
         if isinstance(m, discord.Member):
             uid = m.id
-            val = server_data[str(uid)][lane]
-            msg += f"{m.display_name}（{lane}）: {val}\n"
+            ability = server_data[str(uid)][lane]
+            msg += f"{m.display_name}（{lane}: {ability}）\n"
         else:
-            msg += f"{m}（{lane}）: 能力値不明\n"
+            msg += f"{m}（{lane}）\n"
 
-    msg += "\n**Team B (合計能力値: {})**\n".format(team2_score)
+    msg += f"\n**Team B**（合計スコア: {team2_score}）\n"
     for m, lane in team2_sorted:
         if isinstance(m, discord.Member):
             uid = m.id
-            val = server_data[str(uid)][lane]
-            msg += f"{m.display_name}（{lane}）: {val}\n"
+            ability = server_data[str(uid)][lane]
+            msg += f"{m.display_name}（{lane}: {ability}）\n"
         else:
-            msg += f"{m}（{lane}）: 能力値不明\n"
+            msg += f"{m}（{lane}）\n"
+
+    if warnings:
+        msg += "\n⚠️ **警告**:\n"
+        for w in warnings:
+            msg += f"- {w}\n"
 
     # チーム構成を current_teams.json に保存
     team_A = {lane: m.display_name if isinstance(m, discord.Member) else str(m)
