@@ -383,16 +383,19 @@ async def help_command(ctx):
     await ctx.send("""
 📘 Botコマンド一覧
 
-!join top mid / !join fill - レーン希望で参加（2つまで or fill）
-!leave @user - 参加リストから削除
-!reset - 参加者すべて削除
-!make_teams 20 50 - チーム分け（VC不要・参加者10人）
 !ability @user 10 10 10 10 10 - 能力値登録
 !delete_ability @user - 能力値削除
+
+!join top mid / !join fill - レーン希望で参加（2つまで or fill）
+!leave @user - 参加リストから削除
+!participants_list - 参加者リスト
+!reset - 参加者すべて削除
+!make_teams 20 50 - チーム分け（VC不要・参加者10人）
+
 !show - 能力一覧
 !show_custom - 各個人のカスタム勝率
-!ranking - 各レーン順位
-!win A / B - 勝利チーム報告
+!ranking - 各レーンの能力値ランキング
+!win A / B - 勝利チーム報告 → 能力値変動
 """)
 
 bot.run(os.environ['DISCORD_BOT_TOKEN'])
