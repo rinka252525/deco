@@ -8,6 +8,7 @@ import random
 from itertools import combinations, permutations
 
 intents = discord.Intents.default()
+intents = discord.Intents.all()
 intents.members = True
 intents.message_content = True
 
@@ -15,25 +16,13 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
-# JSON読み書き関数
-def load_json(filename):
-    if os.path.exists(filename):
-        with open(filename, 'r') as f:
-            return json.load(f)
-    return {}
-
-def save_json(filename, data):
-    with open(filename, 'w') as f:
-        json.dump(data, f, indent=4)
-
-
-
-
 DATA_FILE = "abilities.json"
 ability_file = 'abilities.json'
 team_file = 'last_teams.json'
 match_history_file = 'match_history.json'
 participants = {}  # {guild_id: {user_id: [lane1, lane2]}} または ['fill']
+history_file = 'history.json'
+current_teams = {}
 last_teams = {}
 # Ability data structure example:
 # {
@@ -53,6 +42,17 @@ last_teams = {}
 #   }
 # }
 lanes = ['top', 'jg', 'mid', 'adc', 'sup']
+
+# ファイル読み込み/保存用関数
+def load_data(file):
+    if os.path.exists(file):
+        with open(file, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_data(file, data):
+    with open(file, 'w') as f:
+        json.dump(data, f, indent=4)
 
 # JSON読み書き関数
 def load_json(filename):
@@ -93,13 +93,15 @@ async def hello(ctx):
 async def bye(ctx):
     await ctx.send("Botを一時停止します。")
 
-# !ability name top jg mid adc sup
+# 能力登録
 @bot.command()
-async def ability(ctx, name: str, top: int, jg: int, mid: int, adc: int, sup: int):
-    abilities = load_json(ability_file)
-    abilities[name] = {'top': top, 'jg': jg, 'mid': mid, 'adc': adc, 'sup': sup}
-    save_json(ability_file, abilities)
-    await ctx.send(f"{name}の能力値を登録しました。")
+async def ability(ctx, top: int, jg: int, mid: int, adc: int, sup: int):
+    data = load_data(ability_file)
+    user_id = str(ctx.author.id)
+    data[user_id] = {'name': ctx.author.name, 'top': top, 'jg': jg, 'mid': mid, 'adc': adc, 'sup': sup}
+    save_data(ability_file, data)
+    await ctx.send(f"{ctx.author.name} の能力値を登録しました。")
+
 
 @bot.command()
 async def delete_ability(ctx, member: discord.Member):
@@ -111,19 +113,16 @@ async def delete_ability(ctx, member: discord.Member):
     else:
         await ctx.send("そのユーザーのデータは存在しません。")
 
-# !show
+# 能力一覧表示（合計順 + 詳細）
 @bot.command()
 async def show(ctx):
-    abilities = load_json(ability_file)
-    if not abilities:
-        await ctx.send("登録されたデータがありません。")
-        return
-    sorted_data = sorted(abilities.items(), key=lambda x: sum(x[1].values()), reverse=True)
-    result = "**登録済み能力値一覧（合計順）**\n"
-    for name, scores in sorted_data:
-        total = sum(scores.values())
-        result += f"{name}: {scores} 合計: {total}\n"
-    await ctx.send(result)
+    data = load_data(ability_file)
+    sorted_data = sorted(data.items(), key=lambda x: sum(x[1][lane] for lane in ['top', 'jg', 'mid', 'adc', 'sup']), reverse=True)
+    msg = "**能力一覧（合計順）**\n"
+    for user_id, info in sorted_data:
+        total = sum(info[lane] for lane in ['top', 'jg', 'mid', 'adc', 'sup'])
+        msg += f"<@{user_id}> top:{info['top']} jg:{info['jg']} mid:{info['mid']} adc:{info['adc']} sup:{info['sup']} | 合計{total}\n"
+    await ctx.send(msg)
 
 # チーム分けユーティリティ
 def calculate_total(team):
@@ -201,7 +200,7 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     member_ids = list(participants[guild_id].keys())
     server_data = get_server_data(guild_id)
     if not all(str(mid) in server_data for mid in member_ids):
-        await ctx.send("一部の参加者が能力値を登録していません。")
+        await ctx.send(f"一部の参加者が能力値を登録していません。:{mention_list}")
         return
 
     best_score = float('inf')
@@ -404,37 +403,34 @@ async def swap(ctx, member1: discord.Member, member2: discord.Member):
     await ctx.send("入れ替え後のチーム:\n" + format_teams(team_a, team_b))
 
 # !win A または !win B
+# 勝敗報告
 @bot.command()
-async def win(ctx, winner: str):
-    winner = winner.upper()
-    if winner not in ['A', 'B']:
-        await ctx.send("勝者は A または B で指定してください。")
+async def win(ctx, result: str):
+    if result not in ['A', 'B']:
+        await ctx.send("!win A または !win B の形式で入力してください。")
         return
-    last_teams = load_json(team_file)
-    if not last_teams:
-        await ctx.send("直近のチームが存在しません。")
-        return
-    match_history = load_json(match_history_file)
-    abilities = load_json(ability_file)
 
-    loser = 'B' if winner == 'A' else 'A'
-    for team_key, is_winner in [(winner, True), (loser, False)]:
-        for name in last_teams[team_key]:
-            if name not in match_history:
-                match_history[name] = {'wins': 0, 'losses': 0, 'matches': 0}
-            stats = match_history[name]
-            stats['matches'] += 1
-            if is_winner:
-                stats['wins'] += 1
-            else:
-                stats['losses'] += 1
-            change = 10 if stats['matches'] <= 5 else 2
-            sign = 1 if is_winner else -1
-            for lane in abilities[name]:
-                abilities[name][lane] = max(0, abilities[name][lane] + sign * change)
-    save_json(match_history_file, match_history)
-    save_json(ability_file, abilities)
-    await ctx.send(f"勝者: Team {winner}\n能力値を更新しました。")
+    abilities = load_data(ability_file)
+    history = load_data(history_file)
+
+    winner = current_teams[result]
+    loser = current_teams['B' if result == 'A' else 'A']
+
+    for team, is_win in [(winner, True), (loser, False)]:
+        for lane, player in team.items():
+            user_id = str(player.id)
+            if user_id not in history:
+                history[user_id] = {'count': 0}
+            history[user_id]['count'] += 1
+            delta = 10 if history[user_id]['count'] <= 5 else 2
+            if user_id in abilities:
+                current_value = abilities[user_id][lane]
+                new_value = current_value + delta if is_win else max(0, current_value - delta)
+                abilities[user_id][lane] = new_value
+
+    save_data(ability_file, abilities)
+    save_data(history_file, history)
+    await ctx.send(f"勝敗を記録しました。能力値を更新しました。")
 
 
 @bot.command()
