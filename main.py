@@ -318,6 +318,13 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
             msg += f"{m.display_name}（{lane}）: {val}\n"
         else:
             msg += f"{m}（{lane}）: 能力値不明\n"
+# チームを current_teams.json に保存
+current_teams = {
+    'A': team_A,  # team_A は辞書形式 {'Top': 'Alice', 'Jg': 'Bob', ...}
+    'B': team_B
+}
+with open("current_teams.json", "w", encoding="utf-8") as f:
+    json.dump(current_teams, f, indent=4, ensure_ascii=False)
 
     await ctx.send(msg)
 
