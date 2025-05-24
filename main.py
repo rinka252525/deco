@@ -225,6 +225,16 @@ async def ranking(ctx):
                 msg += f"{member.display_name}: {stats.get(lane, 0)}\n"
     await ctx.send(msg)
 
+@bot.command()
+async def reset(ctx):
+    gid = ctx.guild.id
+    if gid in participants:
+        participants[gid].clear()
+        await ctx.send("✅ 参加リストをリセットしました。")
+    else:
+        await ctx.send("参加リストはすでに空です。")
+
+
 @bot.command(name="help_lolgap2")
 async def help_command(ctx):
     await ctx.send("""
@@ -232,6 +242,7 @@ async def help_command(ctx):
 
 !join top mid / !join fill - レーン希望で参加（2つまで or fill）
 !leave @user - 参加リストから削除
+!reset - 参加者すべて削除
 !make_teams lane_diff=20 team_diff=50 - チーム分け（VC不要・参加者10人）
 !ability @user 10 10 10 10 10 - 能力値登録
 !delete_ability @user - 能力値削除
