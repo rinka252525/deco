@@ -1,0 +1,11 @@
+{
+  "guild_id": {
+    "user_id": {
+      "history": [
+        {"lane": "top", "result": "win"},
+        {"lane": "mid", "result": "lose"},
+        ...
+      ]
+    }
+  }
+}
