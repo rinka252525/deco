@@ -197,8 +197,10 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     member_ids = list(participants[guild_id].keys())
     server_data = get_server_data(guild_id)
     if not all(str(mid) in server_data for mid in member_ids):
-        await ctx.send(f"一部の参加者が能力値を登録していません。:{mention_list}")
-        return
+    unregistered_ids = [mid for mid in member_ids if str(mid) not in server_data]
+    mention_list = ', '.join(f'<@{uid}>' for uid in unregistered_ids)
+    await ctx.send(f"一部の参加者が能力値を登録していません：{mention_list}")
+    return
 
     best_score = float('inf')
     best_result = None
