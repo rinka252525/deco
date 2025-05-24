@@ -3,6 +3,7 @@ from discord.ext import commands
 import json
 import os
 from itertools import permutations
+import re
 
 intents = discord.Intents.default()
 intents.members = True
@@ -11,6 +12,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 DATA_FILE = "abilities.json"
+participants = {}  # {guild_id: {user_id: [lane1, lane2]}} または ['fill']
 last_teams = {}
 
 def load_data():
@@ -43,13 +45,7 @@ async def bye(ctx):
 @bot.command()
 async def ability(ctx, member: discord.Member, top: int, jg: int, mid: int, adc: int, sup: int):
     server_data = get_server_data(ctx.guild.id)
-    server_data[str(member.id)] = {
-        "top": top,
-        "jg": jg,
-        "mid": mid,
-        "adc": adc,
-        "sup": sup
-    }
+    server_data[str(member.id)] = {"top": top, "jg": jg, "mid": mid, "adc": adc, "sup": sup}
     update_server_data(ctx.guild.id, server_data)
     await ctx.send(f"{member.display_name} の能力値を登録しました。")
 
@@ -80,25 +76,45 @@ async def show(ctx):
     await ctx.send(msg)
 
 @bot.command()
-async def make_teams(ctx, *, args=None):
-    import re
-
-    voice_state = ctx.author.voice
-    if not voice_state or not voice_state.channel:
-        await ctx.send("VCに人が足りませんよ！")
+async def join(ctx, *lanes):
+    gid = ctx.guild.id
+    if gid not in participants:
+        participants[gid] = {}
+    
+    if not lanes:
+        await ctx.send("希望レーンを2つ、または`fill`を指定してください（例：`!join top jg` または `!join fill`）")
         return
 
-    # デフォルト設定
-    lane_threshold = 20
+    if lanes[0].lower() == 'fill':
+        participants[gid][ctx.author.id] = ['fill']
+        await ctx.send(f"{ctx.author.display_name} をどのレーンでもOKとして登録しました。")
+    elif len(lanes) == 2 and all(lane in ['top', 'jg', 'mid', 'adc', 'sup'] for lane in lanes):
+        participants[gid][ctx.author.id] = list(lanes)
+        await ctx.send(f"{ctx.author.display_name} を希望レーン {lanes[0]}, {lanes[1]} として登録しました。")
+    else:
+        await ctx.send("正しいレーンを2つ指定してください（top, jg, mid, adc, sup）")
+
+@bot.command()
+async def leave(ctx, member: discord.Member = None):
+    target = member or ctx.author
+    gid = ctx.guild.id
+    if gid in participants and target.id in participants[gid]:
+        del participants[gid][target.id]
+        await ctx.send(f"{target.display_name} を参加リストから削除しました。")
+    else:
+        await ctx.send("そのユーザーは登録されていません。")
+
+@bot.command()
+async def make_teams(ctx, *, args=None):
+    gid = ctx.guild.id
+    if gid not in participants or len(participants[gid]) < 10:
+        await ctx.send("十分な参加者がいません（最低10人必要）")
+        return
+
+    lane_threshold = 40
     team_threshold = 50
-    exclude_members = []
 
-    # 引数パース
     if args:
-        # メンション（除外ユーザー）抽出
-        exclude_members = [m for m in ctx.message.mentions]
-
-        # 数値パラメータ抽出
         lane_match = re.search(r'lane_diff=(\d+)', args)
         team_match = re.search(r'team_diff=(\d+)', args)
         if lane_match:
@@ -106,91 +122,85 @@ async def make_teams(ctx, *, args=None):
         if team_match:
             team_threshold = int(team_match.group(1))
 
-    channel = voice_state.channel
-    members = [m for m in channel.members if not m.bot and m not in exclude_members]
-
-    if len(members) < 10:
-        await ctx.send(f"VC内に十分なプレイヤーがいません。（除外後: {len(members)}人）")
-        return
-
-    selected = members[:10]
     server_data = get_server_data(ctx.guild.id)
-    player_data = []
-    for m in selected:
-        if str(m.id) in server_data:
-            player_data.append((m, server_data[str(m.id)]))
-        else:
-            await ctx.send(f"{m.mention} の能力値が未登録です！!ability で登録してください。")
-            return
+    raw_participants = list(participants[gid].items())
+    lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
-    from itertools import permutations
+    def generate_teams():
+        for perm in permutations(raw_participants, 10):
+            role_map = {}
+            used = set()
+            fill_pool = []
 
-    def valid_teams(data):
-        for perm in permutations(data, 10):
-            team1 = perm[:5]
-            team2 = perm[5:]
-            lanes = ['top', 'jg', 'mid', 'adc', 'sup']
-            ok = True
-            for i in range(5):
-                diff = abs(team1[i][1][lanes[i]] - team2[i][1][lanes[i]])
-                if diff > lane_threshold:
-                    ok = False
-                    break
-            if not ok:
+            for user_id, prefs in perm:
+                if prefs == ['fill']:
+                    fill_pool.append(user_id)
+
+            for lane in lanes:
+                for user_id, prefs in perm:
+                    if user_id in used:
+                        continue
+                    if prefs != ['fill'] and lane in prefs:
+                        role_map[lane] = user_id
+                        used.add(user_id)
+                        break
+                else:
+                    if fill_pool:
+                        uid = fill_pool.pop()
+                        role_map[lane] = uid
+                        used.add(uid)
+
+            if len(role_map) < 5:
                 continue
-            sum1 = sum(v[1][lanes[i]] for i, v in enumerate(team1))
-            sum2 = sum(v[1][lanes[i]] for i, v in enumerate(team2))
-            if abs(sum1 - sum2) <= team_threshold:
-                return team1, team2
+
+            team1 = [(uid, server_data.get(str(uid), {})) for uid in list(role_map.values())[:5]]
+            team2 = [(uid, server_data.get(str(uid), {})) for uid in list(role_map.values())[5:]]
+
+            lane_diffs = [abs(team1[i][1].get(lanes[i], 0) - team2[i][1].get(lanes[i], 0)) for i in range(5)]
+            total1 = sum(p[1].get(lanes[i], 0) for i, p in enumerate(team1))
+            total2 = sum(p[1].get(lanes[i], 0) for i, p in enumerate(team2))
+            total_diff = abs(total1 - total2)
+
+            if all(diff <= lane_threshold for diff in lane_diffs) and total_diff <= team_threshold:
+                return team1, team2, lane_diffs, total_diff
         return None
 
-    result = valid_teams(player_data)
+    result = generate_teams()
 
     if result:
-        team1, team2 = result
+        team1, team2, lane_diffs, total_diff = result
+        last_teams[gid] = {"team1": [(ctx.guild.get_member(uid), data) for uid, data in team1],
+                           "team2": [(ctx.guild.get_member(uid), data) for uid, data in team2]}
 
-        last_teams[ctx.guild.id] = {
-            'team1': team1,
-            'team2': team2
-        }
-
-        lanes = ['top', 'jg', 'mid', 'adc', 'sup']
-        msg = f"**✅ Team A** (各レーン差 ≤ {lane_threshold}, 合計差 ≤ {team_threshold})\n"
+        msg = f"**✅ Team A** (lane_diff≤{lane_threshold}, team_diff≤{team_threshold})\n"
         for i in range(5):
-            msg += f"{lanes[i]}: {team1[i][0].mention} ({team1[i][1][lanes[i]]})\n"
+            msg += f"{lanes[i]}: {team1[i][0]} ({team1[i][1].get(lanes[i], 0)})\n"
         msg += f"\n**✅ Team B**\n"
         for i in range(5):
-            msg += f"{lanes[i]}: {team2[i][0].mention} ({team2[i][1][lanes[i]]})\n"
+            msg += f"{lanes[i]}: {team2[i][0]} ({team2[i][1].get(lanes[i], 0)})\n"
         await ctx.send(msg)
     else:
-        await ctx.send(f"⚠ 条件に合うチーム分けが見つかりませんでした。\n（lane_diff≤{lane_threshold}, team_diff≤{team_threshold}）")
-
+        await ctx.send(f"⚠ 条件を満たすチームが見つかりませんでした（lane_diff≤{lane_threshold}, team_diff≤{team_threshold}）\n可能な限り最小差で再編成してください。")
 
 @bot.command()
 async def win(ctx, team: str):
     if ctx.guild.id not in last_teams:
         await ctx.send("前回のチーム分けが見つかりません。先に !make_teams を行ってください。")
         return
-
     if team not in ["A", "B"]:
         await ctx.send("勝ったチームは A か B を指定してください。（例: !win A）")
         return
 
     teams = last_teams[ctx.guild.id]
-    team1 = teams['team1']
-    team2 = teams['team2']
+    winner = teams['team1'] if team == "A" else teams['team2']
+    loser = teams['team2'] if team == "A" else teams['team1']
+    server_data = get_server_data(ctx.guild.id)
     lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
-    winner = team1 if team == "A" else team2
-    loser = team2 if team == "A" else team1
-
-    server_data = get_server_data(ctx.guild.id)
-
     for i in range(5):
-        lane = lanes[i]
         win_id = str(winner[i][0].id)
         lose_id = str(loser[i][0].id)
-
+        lane = lanes[i]
         server_data[win_id][lane] += 2
         server_data[lose_id][lane] = max(0, server_data[lose_id][lane] - 2)
 
@@ -217,39 +227,17 @@ async def ranking(ctx):
 
 @bot.command(name="help_lolgap2")
 async def help_command(ctx):
-    help_text = """
+    await ctx.send("""
 📘 Botコマンド一覧
 
-!hello
-　→ Botが起動しているか確認します。
-
-!bye
-　→ Botを一時停止します。
-
-!ability @ユーザー Top Jg Mid Adc Sup
-　→ 指定したユーザーの能力値を登録または更新します。
-　例: !ability @deco 20 15 30 25 10
-
-!delete_ability @ユーザー
-　→ 指定したユーザーの能力値を削除します。
-
-!show
-　→ 登録済みメンバーの能力値を一覧表示します（ソート付き）。
-
-!ranking
-　→ 各レーンの現在の能力値を表示します（ランキング形式）。
-
-!make_teams exclude=@user1 @user2 lane_diff=数値 team_diff=数値
-　→ VC内の10人を対象にチーム分けを行います。
-　　入力しない場合：レーンごとの能力差が20以内、チーム合計が50以内の組み合わせを探します。
-　　11人以上いる場合、除外したいメンバーを指定してください。
-  　lane_diffは対面、team_diffはチーム能力合計値の差を示します。
-　例: !make_teams exclude=@deco lane_diff=25 team_diff=70
-     VC内からdecoを除いて、対面25差以内、チーム合計70差以内にチーム分け
-
-!win A or B
-　→ 勝利チームを指定し、そのレーンの能力値を +2 / -2 で更新します。
-    """
-    await ctx.send(help_text)
+!join top mid / !join fill - レーン希望で参加（2つまで or fill）
+!leave @user - 参加リストから削除
+!make_teams lane_diff=20 team_diff=50 - チーム分け（VC不要・参加者10人）
+!ability @user 10 10 10 10 10 - 能力値登録
+!delete_ability @user - 能力値削除
+!show - 能力一覧
+!ranking - 各レーン順位
+!win A / B - 勝利チーム報告
+""")
 
 bot.run(os.environ['DISCORD_BOT_TOKEN'])
