@@ -336,54 +336,98 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 
 
 
+@bot.command()
+async def swap(ctx, member1: discord.Member, member2: discord.Member):
+    with open("current_teams.json", "r") as f:
+        teams = json.load(f)
+
+    # 該当プレイヤーのレーンを特定
+    lane1 = lane2 = team1 = team2 = None
+    for team_name, lanes in teams.items():
+        for lane, player in lanes.items():
+            if player == str(member1):
+                lane1, team1 = lane, team_name
+            if player == str(member2):
+                lane2, team2 = lane, team_name
+
+    if lane1 is None or lane2 is None:
+        await ctx.send("指定したメンバーがチームに存在しません。")
+        return
+
+    # 入れ替え
+    teams[team1][lane1], teams[team2][lane2] = str(member2), str(member1)
+
+    with open("current_teams.json", "w") as f:
+        json.dump(teams, f, indent=2)
+
+    await ctx.send(f"{member1.display_name}（{lane1}）と {member2.display_name}（{lane2}）のレーンを交換しました。")
+
+    # 再表示（必要なら make_teams の表示部分を関数化して呼び出し）
+    await show_team_result(ctx, teams)  # ← チーム情報表示関数
 
 
 
 @bot.command()
-async def win(ctx, team: str):
-    if ctx.guild.id not in last_teams:
-        await ctx.send("前回のチーム分けが見つかりません。先に !make_teams を行ってください。")
+async def win(ctx, winner_team: str):
+    if winner_team not in ["teamA", "teamB"]:
+        await ctx.send("勝利チームは 'teamA' か 'teamB' を指定してください。")
         return
 
-    if team not in ["A", "B"]:
-        await ctx.send("勝ったチームは A か B を指定してください。（例: !win A）")
-        return
+    with open("current_teams.json", "r") as f:
+        teams = json.load(f)
 
-    teams = last_teams[ctx.guild.id]
-    team1 = teams['team1']
-    team2 = teams['team2']
-    lanes = ['top', 'jg', 'mid', 'adc', 'sup']
+    with open("abilities.json", "r") as f:
+        abilities = json.load(f)
 
-    winner = team1 if team == "A" else team2
-    loser = team2 if team == "A" else team1
+    with open("history.json", "r") as f:
+        history = json.load(f)
 
-    server_data = get_server_data(ctx.guild.id)
+    loser_team = "teamB" if winner_team == "teamA" else "teamA"
+    changes = {}
 
-    for i in range(5):
-        lane = lanes[i]
-        win_id = str(winner[i][0].id)
-        lose_id = str(loser[i][0].id)
+    for team_name, team_data in teams.items():
+        is_winner = (team_name == winner_team)
+        for lane, user in team_data.items():
+            user = str(user)
+            if user not in history:
+                history[user] = {
+                    "win": 0, "lose": 0,
+                    "lane_win": {l: 0 for l in ["top", "jg", "mid", "adc", "sup"]},
+                    "lane_lose": {l: 0 for l in ["top", "jg", "mid", "adc", "sup"]}
+                }
 
-        for uid, result, delta in [(win_id, "win", 10), (lose_id, "lose", -10)]:
-            if uid not in server_data:
-                continue
+            wins = history[user]["win"]
+            losses = history[user]["lose"]
+            total_matches = wins + losses
 
-            if "matches" not in server_data[uid]:
-                server_data[uid]["matches"] = {l: 0 for l in lanes}
-            if "custom_history" not in server_data[uid]:
-                server_data[uid]["custom_history"] = []
+            delta = 10 if total_matches < 5 else 2
+            change = delta if is_winner else -delta
 
-            match_count = server_data[uid]["matches"].get(lane, 0)
-            change = 10 if match_count < 5 else 2
-            if result == "lose":
-                change = -change
+            if user in abilities and lane in abilities[user]:
+                new_value = max(0, abilities[user][lane] + change)
+                changes[user] = (abilities[user][lane], new_value)
+                abilities[user][lane] = new_value
 
-            server_data[uid][lane] = max(0, server_data[uid].get(lane, 0) + change)
-            server_data[uid]["matches"][lane] = match_count + 1
-            server_data[uid]["custom_history"].append({"lane": lane, "result": result, "change": change})
+            # 履歴更新
+            if is_winner:
+                history[user]["win"] += 1
+                history[user]["lane_win"][lane] += 1
+            else:
+                history[user]["lose"] += 1
+                history[user]["lane_lose"][lane] += 1
 
-    update_server_data(ctx.guild.id, server_data)
-    await ctx.send("勝敗結果を反映しました！")
+    with open("abilities.json", "w") as f:
+        json.dump(abilities, f, indent=2)
+
+    with open("history.json", "w") as f:
+        json.dump(history, f, indent=2)
+
+    msg = f"✅ `{winner_team}` が勝利しました！能力値を更新しました。\n"
+    for user, (before, after) in changes.items():
+        msg += f"- {user}: {before} → {after}\n"
+
+    await ctx.send(msg)
+
 
 @bot.command()
 async def show_custom(ctx):
@@ -467,6 +511,7 @@ async def help_command(ctx):
 !participants_list - 参加者リスト
 !reset - 参加者すべて削除
 !make_teams 20 50 - チーム分け（VC不要・参加者10人）
+!swap @user @user - レーン交換
 
 !show - 能力一覧
 !show_custom - 各個人のカスタム勝率
