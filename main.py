@@ -374,7 +374,7 @@ async def help_command(ctx):
 !join top mid / !join fill - レーン希望で参加（2つまで or fill）
 !leave @user - 参加リストから削除
 !reset - 参加者すべて削除
-!make_teams lane_diff=20 team_diff=50 - チーム分け（VC不要・参加者10人）
+!make_teams 20 50 - チーム分け（VC不要・参加者10人）
 !ability @user 10 10 10 10 10 - 能力値登録
 !delete_ability @user - 能力値削除
 !show - 能力一覧
