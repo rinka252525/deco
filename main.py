@@ -4,6 +4,8 @@ import json
 import os
 from itertools import permutations
 import re
+import random
+from itertools import combinations, permutations
 
 intents = discord.Intents.default()
 intents.members = True
@@ -51,6 +53,7 @@ def update_server_data(guild_id, server_data):
     data[str(guild_id)] = server_data
     save_data(data)
 
+
 @bot.command()
 async def hello(ctx):
     await ctx.send("こんにちは！Botは稼働中です。")
@@ -88,7 +91,7 @@ async def show(ctx):
         member = ctx.guild.get_member(int(uid))
         if not member:
             continue
-        total = sum(stats.values())
+        total = sum(stats.get(role, 0) for role in lanes)
         msg += f"{member.display_name}: Top {stats['top']}, Jg {stats['jg']}, Mid {stats['mid']}, Adc {stats['adc']}, Sup {stats['sup']} | 合計: {total}\n"
     await ctx.send(msg)
 
@@ -98,26 +101,25 @@ async def join(ctx, *args):
     if gid not in participants:
         participants[gid] = {}
 
-    mentioned = ctx.message.mentions  # メンションされたメンバー一覧
-    lanes = [a.lower() for a in args if a.lower() not in [m.mention for m in mentioned]]
+    mentioned = ctx.message.mentions
+    lanes_input = [a.lower() for a in args if a.lower() not in [m.mention for m in mentioned]]
 
     if not mentioned:
         mentioned = [ctx.author]
 
-    if not lanes:
+    if not lanes_input:
         await ctx.send("希望レーンを2つ指定してください。例: `!join @user1 top mid` または `!join fill`")
         return
 
     for user in mentioned:
-        if len(lanes) == 1 and lanes[0] == "fill":
+        if len(lanes_input) == 1 and lanes_input[0] == "fill":
             participants[gid][user.id] = ["fill"]
             await ctx.send(f"{user.display_name} を fill で参加登録しました。")
-        elif len(lanes) == 2:
-            participants[gid][user.id] = lanes
-            await ctx.send(f"{user.display_name} を {lanes[0]} と {lanes[1]} 希望で参加登録しました。")
+        elif len(lanes_input) == 2:
+            participants[gid][user.id] = lanes_input
+            await ctx.send(f"{user.display_name} を {lanes_input[0]} と {lanes_input[1]} 希望で参加登録しました。")
         else:
             await ctx.send(f"{user.display_name} の登録に失敗しました。レーンは2つ、または 'fill' を指定してください。")
-
 
 @bot.command()
 async def leave(ctx, member: discord.Member = None):
@@ -136,18 +138,13 @@ async def participants_list(ctx):
         await ctx.send("現在、参加者は登録されていません。")
         return
 
-    lines = []
-    for user_id, lanes in participants[gid].items():
-        member = ctx.guild.get_member(user_id)
-        name = member.display_name if member else f"Unknown({user_id})"
-        lane_info = ", ".join(lanes)
-        lines.append(f"**{name}**：{lane_info}")
-
-    msg = "\n".join(lines)
-    await ctx.send(f"**現在の参加者一覧：**\n{msg}")
-
-
-from itertools import combinations, permutations
+    msg = "**現在の参加者一覧：**\n"
+    for uid, pref in participants[gid].items():
+        member = ctx.guild.get_member(uid)
+        if not member:
+            continue
+        msg += f"{member.display_name}：{', '.join(pref)}\n"
+    await ctx.send(msg)
 
 @bot.command()
 async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
@@ -157,119 +154,112 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
         return
 
     member_ids = list(participants[guild_id].keys())
-    ability_data = load_ability_data()
-
-    if not all(str(member_id) in ability_data for member_id in member_ids):
+    server_data = get_server_data(guild_id)
+    if not all(str(mid) in server_data for mid in member_ids):
         await ctx.send("一部の参加者が能力値を登録していません。")
         return
 
-    all_lane_options = ['top', 'jg', 'mid', 'adc', 'sup']
     best_score = float('inf')
-    best_combination = None
-    best_roles = None
-    warning_messages = []
+    best_result = None
+    warnings = []
 
     for team1_ids in combinations(member_ids, 5):
         team2_ids = [uid for uid in member_ids if uid not in team1_ids]
-        team1_ids = list(team1_ids)
 
-        for team1_roles in permutations(all_lane_options):
-            role_assignment = {}
-
+        for team1_roles in permutations(lanes):
             try:
-                # Team 1 レーン割り当て
-                for i, user_id in enumerate(team1_ids):
-                    lane = team1_roles[i]
-                    role_assignment[user_id] = lane
+                role_map = {}
+                assigned = set()
 
-                # Team 2 レーン割り当て（希望レーン優先）
-                remaining_roles = set(all_lane_options) - set(team1_roles)
-                for user_id in team2_ids:
-                    preferred_lanes = participants[guild_id][user_id]
-                    assigned = False
-                    for lane in preferred_lanes:
-                        if lane in remaining_roles:
-                            role_assignment[user_id] = lane
-                            remaining_roles.remove(lane)
-                            assigned = True
+                for uid, lane in zip(team1_ids, team1_roles):
+                    role_map[uid] = lane
+                    assigned.add(lane)
+
+                remaining = set(lanes)
+                for uid in team2_ids:
+                    prefs = participants[guild_id].get(uid, [])
+                    assigned_lane = None
+                    for p in prefs:
+                        if p in remaining:
+                            assigned_lane = p
                             break
-                    if not assigned:
-                        for lane in all_lane_options:
-                            if lane not in role_assignment.values():
-                                role_assignment[user_id] = lane
-                                break
+                    if not assigned_lane:
+                        unassigned = list(remaining)
+                        if not unassigned:
+                            break
+                        assigned_lane = random.choice(unassigned)
+                    role_map[uid] = assigned_lane
+                    remaining.discard(assigned_lane)
 
-                if len(role_assignment) != 10:
+                if len(role_map) != 10:
                     continue
 
-            except Exception as e:
-                print(f"例外発生: {e}")
+                team1_score = team2_score = 0
+                total_lane_diff = 0
+                exceeded = False
+
+                for lane in lanes:
+                    uid1 = [u for u in team1_ids if role_map[u] == lane][0]
+                    uid2 = [u for u in team2_ids if role_map[u] == lane][0]
+                    val1 = server_data[str(uid1)][lane]
+                    val2 = server_data[str(uid2)][lane]
+                    team1_score += val1
+                    team2_score += val2
+                    diff = abs(val1 - val2)
+                    total_lane_diff += diff
+                    if diff > lane_diff:
+                        exceeded = True
+
+                team_diff_value = abs(team1_score - team2_score)
+                if team_diff_value > team_diff:
+                    exceeded = True
+
+                score = total_lane_diff + team_diff_value
+                if exceeded:
+                    score += 1000
+
+                if score < best_score:
+                    best_score = score
+                    best_result = (team1_ids, team2_ids, role_map)
+                    warnings = []
+                    if exceeded:
+                        for lane in lanes:
+                            uid1 = [u for u in team1_ids if role_map[u] == lane][0]
+                            uid2 = [u for u in team2_ids if role_map[u] == lane][0]
+                            val1 = server_data[str(uid1)][lane]
+                            val2 = server_data[str(uid2)][lane]
+                            diff = abs(val1 - val2)
+                            if diff > lane_diff:
+                                warnings.append(f"{lane} の能力差が {diff} あります。")
+                        if team_diff_value > team_diff:
+                            warnings.append(f"チーム合計の能力差が {team_diff_value} あります。")
+            except:
                 continue
 
-            lane_diffs = {}
-            team1_score = 0
-            team2_score = 0
-            skip = False
-
-            for lane in all_lane_options:
-                user1 = [uid for uid, r in role_assignment.items() if r == lane and uid in team1_ids][0]
-                user2 = [uid for uid, r in role_assignment.items() if r == lane and uid in team2_ids][0]
-                score1 = ability_data[str(user1)][lane]
-                score2 = ability_data[str(user2)][lane]
-                diff = abs(score1 - score2)
-                lane_diffs[lane] = diff
-                team1_score += score1
-                team2_score += score2
-
-                if diff > lane_diff:
-                    skip = True
-
-            team_score_diff = abs(team1_score - team2_score)
-            if team_score_diff > team_diff:
-                skip = True
-
-            score_sum = sum(lane_diffs.values()) + team_score_diff
-            if skip:
-                score_sum += 1000  # 条件違反にペナルティ
-
-            if score_sum < best_score:
-                best_score = score_sum
-                best_combination = (team1_ids, team2_ids)
-                best_roles = role_assignment
-
-                # 警告メッセージ更新
-                warning_messages = []
-                for lane, diff in lane_diffs.items():
-                    if diff > lane_diff:
-                        warning_messages.append(f"{lane} の能力差が {diff} あります。")
-                if team_score_diff > team_diff:
-                    warning_messages.append(f"チーム合計の能力差が {team_score_diff} あります。")
-
-    if best_combination is None:
-        await ctx.send("適切なチームを編成できませんでした。")
+    if not best_result:
+        await ctx.send("チームを編成できませんでした。")
         return
 
-    team1_ids, team2_ids = best_combination
-    response = ""
+    t1, t2, role_map = best_result
+    last_teams[guild_id] = {
+        "team1": [(ctx.guild.get_member(uid), role_map[uid]) for uid in t1],
+        "team2": [(ctx.guild.get_member(uid), role_map[uid]) for uid in t2],
+    }
 
-    if warning_messages:
-        response += "⚠️ 条件を満たす編成が見つかりませんでした。最もバランスの取れたチームを提示します。\n"
-        for msg in warning_messages:
-            response += f"{msg}\n"
+    msg = ""
+    if warnings:
+        msg += "⚠️ 条件を満たす編成が見つかりませんでした。できるだけ近い組み合わせを表示します。\n"
+        msg += "\n".join(warnings) + "\n"
 
-    response += "\n**Team 1**\n"
-    for uid in team1_ids:
-        member = await ctx.guild.fetch_member(uid)
-        lane = best_roles[uid]
-        response += f"{member.display_name}（{lane}）\n"
+    msg += "\n**Team A**\n"
+    for m, lane in last_teams[guild_id]["team1"]:
+        msg += f"{m.display_name}（{lane}）\n"
 
-    response += "\n**Team 2**\n"
-    for uid in team2_ids:
-        member = await ctx.guild.fetch_member(uid)
-        lane = best_roles[uid]
-        response += f"{member.display_name}（{lane}）\n"
+    msg += "\n**Team B**\n"
+    for m, lane in last_teams[guild_id]["team2"]:
+        msg += f"{m.display_name}（{lane}）\n"
 
-    await ctx.send(response)
+    await ctx.send(msg)
 
 
 
