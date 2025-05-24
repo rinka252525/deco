@@ -81,6 +81,7 @@ async def delete_ability(ctx, member: discord.Member):
 
 @bot.command()
 async def show(ctx):
+    lanes = ['top', 'jg', 'mid', 'adc', 'sup']  # ここを追加
     server_data = get_server_data(ctx.guild.id)
     if not server_data:
         await ctx.send("登録されているデータがありません。")
@@ -94,6 +95,7 @@ async def show(ctx):
         total = sum(stats.get(role, 0) for role in lanes)
         msg += f"{member.display_name}: Top {stats['top']}, Jg {stats['jg']}, Mid {stats['mid']}, Adc {stats['adc']}, Sup {stats['sup']} | 合計: {total}\n"
     await ctx.send(msg)
+
 
 @bot.command()
 async def join(ctx, *args):
