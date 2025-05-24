@@ -14,6 +14,23 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 DATA_FILE = "abilities.json"
 participants = {}  # {guild_id: {user_id: [lane1, lane2]}} または ['fill']
 last_teams = {}
+# Ability data structure example:
+# {
+#   "guild_id": {
+#       "user_id": {
+#           "top": 100,
+#           "jg": 80,
+#           "mid": 90,
+#           "adc": 85,
+#           "sup": 95,
+#           "matches": {"top": 3, "jg": 0, ...},
+#           "custom_history": [
+#               {"lane": "top", "result": "win", "change": 10},
+#               {"lane": "mid", "result": "lose", "change": -10},
+#           ]
+#       }
+#   }
+# }
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -213,25 +230,78 @@ async def win(ctx, team: str):
     if ctx.guild.id not in last_teams:
         await ctx.send("前回のチーム分けが見つかりません。先に !make_teams を行ってください。")
         return
+
     if team not in ["A", "B"]:
         await ctx.send("勝ったチームは A か B を指定してください。（例: !win A）")
         return
 
     teams = last_teams[ctx.guild.id]
-    winner = teams['team1'] if team == "A" else teams['team2']
-    loser = teams['team2'] if team == "A" else teams['team1']
-    server_data = get_server_data(ctx.guild.id)
+    team1 = teams['team1']
+    team2 = teams['team2']
     lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
+    winner = team1 if team == "A" else team2
+    loser = team2 if team == "A" else team1
+
+    server_data = get_server_data(ctx.guild.id)
+
     for i in range(5):
+        lane = lanes[i]
         win_id = str(winner[i][0].id)
         lose_id = str(loser[i][0].id)
-        lane = lanes[i]
-        server_data[win_id][lane] += 2
-        server_data[lose_id][lane] = max(0, server_data[lose_id][lane] - 2)
+
+        for uid, result, delta in [(win_id, "win", 10), (lose_id, "lose", -10)]:
+            if uid not in server_data:
+                continue
+
+            if "matches" not in server_data[uid]:
+                server_data[uid]["matches"] = {l: 0 for l in lanes}
+            if "custom_history" not in server_data[uid]:
+                server_data[uid]["custom_history"] = []
+
+            match_count = server_data[uid]["matches"].get(lane, 0)
+            change = 10 if match_count < 5 else 2
+            if result == "lose":
+                change = -change
+
+            server_data[uid][lane] = max(0, server_data[uid].get(lane, 0) + change)
+            server_data[uid]["matches"][lane] = match_count + 1
+            server_data[uid]["custom_history"].append({"lane": lane, "result": result, "change": change})
 
     update_server_data(ctx.guild.id, server_data)
     await ctx.send("勝敗結果を反映しました！")
+
+@bot.command()
+async def show_custom(ctx):
+    server_data = get_server_data(ctx.guild.id)
+    if not server_data:
+        await ctx.send("データが存在しません。")
+        return
+
+    msg = "**📘 各プレイヤーのカスタム戦績**\n"
+    for uid, stats in server_data.items():
+        member = ctx.guild.get_member(int(uid))
+        if not member:
+            continue
+
+        msg += f"\n🔹 {member.display_name}\n"
+        history = stats.get("custom_history", [])
+        if not history:
+            msg += "　記録なし\n"
+            continue
+
+        lane_histories = {}
+        for entry in history:
+            lane_histories.setdefault(entry['lane'], []).append(entry)
+
+        for lane, records in lane_histories.items():
+            msg += f"　- {lane}: " + ", ".join([f"{r['result']}({r['change']:+})" for r in records]) + "\n"
+
+    await ctx.send(msg)
+
+# bot.run(...) は既に実行中のコードで保持
+# 他のコマンドとの統合が必要な場合はお知らせください。
+
 
 @bot.command()
 async def ranking(ctx):
@@ -273,6 +343,7 @@ async def help_command(ctx):
 !ability @user 10 10 10 10 10 - 能力値登録
 !delete_ability @user - 能力値削除
 !show - 能力一覧
+!hsow_custom - 各個人のカスタム勝率
 !ranking - 各レーン順位
 !win A / B - 勝利チーム報告
 """)
