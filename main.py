@@ -151,7 +151,7 @@ async def participants_list(ctx):
 @bot.command()
 async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     guild_id = ctx.guild.id
-    lanes = ['top', 'jg', 'mid', 'adc', 'sup']  # ここで定義
+    lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
     if guild_id not in participants or len(participants[guild_id]) < 10:
         await ctx.send("参加者が10人未満です。")
@@ -175,14 +175,12 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                 role_map = {}
                 assigned = set()
 
-                # team1のメンバーにレーン割り当て
                 for uid, lane in zip(team1_ids, team1_roles):
                     role_map[uid] = lane
                     assigned.add(lane)
 
                 remaining = set(lanes) - assigned
 
-                # team2のメンバーにレーン割り当て
                 for uid in team2_ids:
                     prefs = participants[guild_id].get(uid, [])
                     if not prefs:
@@ -236,14 +234,9 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                     if diff > lane_diff:
                         exceeded = True
 
-                if exceeded:
-                    team_diff_value = abs(team1_score - team2_score)
-                    if team_diff_value > team_diff:
-                        exceeded = True
-                else:
-                    team_diff_value = abs(team1_score - team2_score)
-                    if team_diff_value > team_diff:
-                        exceeded = True
+                team_diff_value = abs(team1_score - team2_score)
+                if team_diff_value > team_diff:
+                    exceeded = True
 
                 score = total_lane_diff + team_diff_value
                 if exceeded:
@@ -279,26 +272,55 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
         "team2": [(ctx.guild.get_member(uid) or f"Unknown User {uid}", role_map[uid]) for uid in t2],
     }
 
+    # チームメンバーをレーン順に並べ替え
+    def sort_by_lane(team):
+        # team: list of (member, lane)
+        return sorted(team, key=lambda x: lanes.index(x[1]))
+
+    team1_sorted = sort_by_lane(last_teams[guild_id]["team1"])
+    team2_sorted = sort_by_lane(last_teams[guild_id]["team2"])
+
+    # 各チームの合計能力値算出
+    def calc_team_score(team):
+        score = 0
+        for m, lane in team:
+            if isinstance(m, discord.Member):
+                uid = m.id
+            else:
+                # Unknown userの場合IDがわからないので0とする（または処理を分ける）
+                uid = None
+            if uid is not None:
+                score += server_data[str(uid)][lane]
+        return score
+
+    team1_score = calc_team_score(team1_sorted)
+    team2_score = calc_team_score(team2_sorted)
+
     msg = ""
     if warnings:
         msg += "⚠️ 条件を満たす編成が見つかりませんでした。できるだけ近い組み合わせを表示します。\n"
         msg += "\n".join(warnings) + "\n"
 
-    msg += "\n**Team A**\n"
-    for m, lane in last_teams[guild_id]["team1"]:
+    msg += "\n**Team A (合計能力値: {})**\n".format(team1_score)
+    for m, lane in team1_sorted:
         if isinstance(m, discord.Member):
-            msg += f"{m.display_name}（{lane}）\n"
+            uid = m.id
+            val = server_data[str(uid)][lane]
+            msg += f"{m.display_name}（{lane}）: {val}\n"
         else:
-            msg += f"{m}（{lane}）\n"
+            msg += f"{m}（{lane}）: 能力値不明\n"
 
-    msg += "\n**Team B**\n"
-    for m, lane in last_teams[guild_id]["team2"]:
+    msg += "\n**Team B (合計能力値: {})**\n".format(team2_score)
+    for m, lane in team2_sorted:
         if isinstance(m, discord.Member):
-            msg += f"{m.display_name}（{lane}）\n"
+            uid = m.id
+            val = server_data[str(uid)][lane]
+            msg += f"{m.display_name}（{lane}）: {val}\n"
         else:
-            msg += f"{m}（{lane}）\n"
+            msg += f"{m}（{lane}）: 能力値不明\n"
 
     await ctx.send(msg)
+
 
 
 
