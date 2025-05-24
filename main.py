@@ -244,7 +244,8 @@ async def help_command(ctx):
 　　入力しない場合：レーンごとの能力差が20以内、チーム合計が50以内の組み合わせを探します。
 　　11人以上いる場合、除外したいメンバーを指定してください。
   　lane_diffは対面、team_diffはチーム能力合計値の差を示します。
-　例: !make_teams @deco lane_diff=25 team_diff=70
+　例: !make_teams exclude=@deco lane_diff=25 team_diff=70
+     VC内からdecoを除いて、対面25差以内、チーム合計70差以内にチーム分け
 
 !win A or B
 　→ 勝利チームを指定し、そのレーンの能力値を +2 / -2 で更新します。
