@@ -250,33 +250,25 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                     role_map[uid] = lane
                     assigned.add(lane)
 
-                remaining = set(lanes) - assigned
+                                # チーム2のロール割り当て（Team Bも5ロール固定で割り当てる）
+                valid = False
+                for team2_roles in permutations(lanes):
+                    try_role_map = role_map.copy()
+                    success = True
+                    for uid, lane in zip(team2_ids, team2_roles):
+                        prefs = participants[guild_id].get(uid, [])
+                        if prefs and lane not in prefs and 'fill' not in prefs:
+                            success = False
+                            break
+                        try_role_map[uid] = lane
+                    if success:
+                        role_map = try_role_map
+                        valid = True
+                        break
 
-                # チーム2のロール割り当て
-                for uid in team2_ids:
-                    prefs = participants[guild_id].get(uid, [])
-                    if not prefs:
-                        prefs = ['fill']
+                if not valid:
+                    continue  # この組み合わせはスキップ
 
-                    assigned_lane = None
-                    if 'fill' in prefs:
-                        if remaining:
-                            assigned_lane = random.choice(list(remaining))
-                        else:
-                            assigned_lane = random.choice(lanes)
-                    else:
-                        for p in prefs:
-                            if p in remaining:
-                                assigned_lane = p
-                                break
-                        if assigned_lane is None:
-                            if remaining:
-                                assigned_lane = random.choice(list(remaining))
-                            else:
-                                assigned_lane = random.choice(lanes)
-
-                    role_map[uid] = assigned_lane
-                    remaining.discard(assigned_lane)
 
                 if len(role_map) != 10:
                     continue
