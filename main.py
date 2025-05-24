@@ -388,6 +388,10 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     team_B = {lane: m.display_name if isinstance(m, discord.Member) else str(m)
               for m, lane in team2_sorted}
 
+    # 例: make_teams コマンドの中
+    teams = {'A': team_a_names, 'B': team_b_names}
+    save_json(team_file, teams)
+
     current_teams = {
         'A': team_A,
         'B': team_B
@@ -402,9 +406,10 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 
 # !swap @user1 @user2
 @bot.command()
+@bot.command()
 async def swap(ctx, member1: discord.Member, member2: discord.Member):
     last_teams = load_json(team_file)
-    if not last_teams:
+    if not last_teams or 'A' not in last_teams or 'B' not in last_teams:
         await ctx.send("直近のチームが存在しません。")
         return
     name1 = member1.name
@@ -439,7 +444,7 @@ async def win(ctx, result: str):
 
     # 現在のチーム情報（保存されている前提）
     current_teams = load_json(team_file)
-    if not current_teams:
+    if not current_teams or 'A' not in current_teams or 'B' not in current_teams:
         await ctx.send("直近のチーム情報が見つかりません。")
         return
 
