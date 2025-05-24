@@ -1,15 +1,4 @@
 {
-  "A": {
-    "top": "Alice",
-    "jg": "Bob",
-    "mid": "Carol",
-    "adc": "Dave",
-    "sup": "Eve"
-  },
-  "B": {
-    "top": "Frank",
-    "jg": "Grace",
-    "mid": "Heidi",
-    "adc": "Ivan",
-    "sup": "Judy"
-  }
+  "teamA": {"top": "UserA", "jg": "UserB", ...},
+  "teamB": {"top": "UserF", "jg": "UserG", ...}
+}
