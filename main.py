@@ -358,14 +358,14 @@ async def ranking(ctx):
         for lane in lanes:
             rankings[lane].append((member.display_name, stats.get(lane, 0)))
 
-    response = "**📊 レーン別ランキング**\n"
+    msg = "**🔝 レーン別ランキング**\n"
     for lane in lanes:
-        response += f"\n__{lane.upper()}__\n"
-        sorted_lane = sorted(rankings[lane], key=lambda x: x[1], reverse=True)
-        for i, (name, score) in enumerate(sorted_lane, start=1):
-            response += f"{i}. {name}: {score}\n"
+        msg += f"\n**{lane.upper()}**\n"
+        sorted_ranks = sorted(rankings[lane], key=lambda x: x[1], reverse=True)
+        for i, (name, score) in enumerate(sorted_ranks, 1):
+            msg += f"{i}. {name} - {score}\n"
 
-    await ctx.send(response)
+    await ctx.send(msg)
 
 
 @bot.command()
