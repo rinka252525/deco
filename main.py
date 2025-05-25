@@ -151,24 +151,23 @@ def format_teams(team_a, team_b):
 
 
 
-participants = {}  # グローバルで定義しておく
 
-participants = {}  # グローバル変数
 
 @bot.command()
-async def join(ctx, lane1: str = None, lane2: str = None):
+async def join(ctx, member: discord.Member = None, lane1: str = None, lane2: str = None):
     global participants
 
+    if member is None:
+        member = ctx.author  # メンションがない場合は実行者自身
     if lane1 is None or lane2 is None:
-        await ctx.send("希望レーンを2つ指定してください。例：`!join top mid`")
+        await ctx.send("希望レーンを2つ指定してください。例：`!join @user top mid` または `!join top mid`")
         return
 
-    # 入力の整形：小文字化＋前後の空白削除
+    # 入力整形
     lane1 = lane1.strip().lower()
     lane2 = lane2.strip().lower()
 
     valid_lanes = ['top', 'jg', 'mid', 'adc', 'sup', 'fill']
-
     if lane1 not in valid_lanes or lane2 not in valid_lanes:
         await ctx.send(f"指定されたレーンが無効です。\n有効なレーン: {', '.join(valid_lanes)}")
         return
@@ -177,26 +176,34 @@ async def join(ctx, lane1: str = None, lane2: str = None):
     if server_id not in participants:
         participants[server_id] = {}
 
-    participants[server_id][str(ctx.author.id)] = {
-        'name': ctx.author.display_name,
+    participants[server_id][str(member.id)] = {
+        'name': member.display_name,
         'lane1': lane1,
         'lane2': lane2
     }
 
-    await ctx.send(f"{ctx.author.display_name} が `{lane1.upper()}` / `{lane2.upper()}` で参加登録しました。")
+    await ctx.send(f"{member.display_name} が `{lane1.upper()}` / `{lane2.upper()}` で参加登録しました。")
+
 
 
 
 
 @bot.command()
 async def leave(ctx, member: discord.Member = None):
-    target = member or ctx.author
-    gid = ctx.guild.id
-    if gid in participants and target.id in participants[gid]:
-        del participants[gid][target.id]
-        await ctx.send(f"{target.display_name} を参加リストから削除しました。")
+    global participants
+
+    if member is None:
+        member = ctx.author  # メンションがない場合は実行者自身
+
+    server_id = str(ctx.guild.id)
+    user_id = str(member.id)
+
+    if server_id in participants and user_id in participants[server_id]:
+        del participants[server_id][user_id]
+        await ctx.send(f"{member.display_name} の参加登録を削除しました。")
     else:
-        await ctx.send("そのユーザーは登録されていません。")
+        await ctx.send(f"{member.display_name} は参加登録されていません。")
+
 
 @bot.command()
 async def participants_list(ctx):
