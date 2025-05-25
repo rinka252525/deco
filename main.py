@@ -352,6 +352,40 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 
     team1_ids, team2_ids, role_map = best_result
 
+    if best_result:
+    team1_ids, team2_ids, role_map = best_result
+
+    last_teams = {
+        "team_a": {str(uid): role_map[uid] for uid in team1_ids},
+        "team_b": {str(uid): role_map[uid] for uid in team2_ids},
+        "guild_id": str(ctx.guild.id)  # 保存しておくと他コマンドでも参照しやすい
+    }
+
+    save_json(team_file, last_teams)  # ← ファイルへ保存
+
+    msg = "**チームが決まりました！**\n"
+    msg += "**Team A**\n"
+    for uid in team1_ids:
+        member = ctx.guild.get_member(uid)
+        lane = role_map[uid]
+        val = server_data[str(uid)][lane]
+        msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
+
+    msg += "\n**Team B**\n"
+    for uid in team2_ids:
+        member = ctx.guild.get_member(uid)
+        lane = role_map[uid]
+        val = server_data[str(uid)][lane]
+        msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
+
+    if best_score >= 1000:
+        msg += "\n⚠️ 条件を完全には満たすチームは見つかりませんでしたが、最善の組み合わせを選びました。"
+
+    await ctx.send(msg)
+else:
+    await ctx.send("条件を満たすチームが見つかりませんでした。")
+    
+
     # 表示用フォーマット関数
     def team_description(team_ids):
         lines = []
@@ -365,14 +399,6 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 
     team_a_total = sum(server_data[str(uid)][role_map[uid]] for uid in team1_ids)
     team_b_total = sum(server_data[str(uid)][role_map[uid]] for uid in team2_ids)
-
-   # msg = f"**Team A (Total: {team_a_total})**\n{team_description(team1_ids)}\n\n"
-   # msg += f"**Team B (Total: {team_b_total})**\n{team_description(team2_ids)}\n"
-
-    #if warnings:
-        #msg += "\n⚠️ **警告**:\n" + "\n".join(warnings)
-
-    #await ctx.send(msg)
 
     # チーム情報を保存
     global last_teams
@@ -475,19 +501,19 @@ async def swap(ctx, member1: discord.Member, member2: discord.Member):
 
 
 @bot.command()
-async def win(ctx, result: str):
-    if result not in ['A', 'B']:
-        await ctx.send("!win A または !win B の形式で入力してください。")
+async def win(ctx, winner: str):
+    winner = winner.upper()
+    if winner not in ["A", "B"]:
+        await ctx.send("勝者は A または B で指定してください。")
         return
 
-    guild_id = str(ctx.guild.id)
-    last_teams = load_data(team_file)
-    server_data = get_server_data(ctx.guild.id)
-    history_data = load_data("history.json")
-
-    if guild_id not in last_teams:
-        await ctx.send("直近のチーム情報が見つかりません。")
+    last_teams = load_json(team_file)
+    if not last_teams or "team_a" not in last_teams or "team_b" not in last_teams:
+        await ctx.send("直近のチームデータが見つかりません。")
         return
+
+    # あとは last_teams["team_a"] / ["team_b"] からメンバーIDとレーンを取り出して処理
+
 
     winner_key = "team_a" if result == 'A' else "team_b"
     loser_key = "team_b" if result == 'A' else "team_a"
