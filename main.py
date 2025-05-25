@@ -568,6 +568,35 @@ async def reset(ctx):
     else:
         await ctx.send("参加リストはすでに空です。")
 
+@bot.command()
+async def history(ctx):
+    history_data = load_json("history.json")
+    ability_data = load_json("ability.json")
+
+    if not history_data:
+        await ctx.send("戦績データがまだありません。")
+        return
+
+    embed = discord.Embed(title="📊 プレイヤー戦績一覧", color=discord.Color.blue())
+    for uid, stats in history_data.items():
+        user = await bot.fetch_user(int(uid))
+        name = user.display_name
+        total_games = stats.get("games", 0)
+        total_wins = stats.get("wins", 0)
+        winrate = f"{(total_wins / total_games * 100):.1f}%" if total_games > 0 else "0%"
+        text = f"総合成績: {total_wins}勝 / {total_games}戦（勝率: {winrate}）\n"
+
+        # レーン別成績
+        lane_stats = stats.get("lane", {})
+        for lane, ldata in lane_stats.items():
+            lw, lg = ldata["wins"], ldata["games"]
+            lwr = f"{(lw / lg * 100):.1f}%" if lg > 0 else "0%"
+            text += f"- {lane}: {lw}勝 / {lg}戦（{lwr}）\n"
+
+        embed.add_field(name=name, value=text, inline=False)
+
+    await ctx.send(embed=embed)
+
 
 @bot.command(name="help_lolgap2")
 async def help_command(ctx):
@@ -585,9 +614,11 @@ async def help_command(ctx):
 !swap @user @user - レーン交換
 
 !show - 能力一覧
-!show_custom - 各個人のカスタム勝率
 !ranking - 各レーンの能力値ランキング
 !win A / B - 勝利チーム報告 → 能力値変動
+
+!show_custom - 各個人のカスタム勝率
+!history - カスタム結果
 """)
 
 bot.run(os.environ['DISCORD_BOT_TOKEN'])
