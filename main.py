@@ -381,7 +381,6 @@ if best_result:
 
     if best_score >= 1000:
         msg += "\n⚠️ 条件を完全には満たすチームは見つかりませんでしたが、最善の組み合わせを選びました。"
-
     await ctx.send(msg)
 
     
