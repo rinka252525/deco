@@ -178,12 +178,14 @@ async def join(ctx, *args):
         await ctx.send(f"指定されたレーンが無効です。\n有効なレーン: {', '.join(valid_lanes)}")
         return
 
-    guild_id = str(ctx.guild.id)
+    guild_id = ctx.guild.id
+    user_id = ctx.author.id
+
     if guild_id not in participants:
         participants[guild_id] = {}
 
-    participants[guild_id][str(member.id)] = [lane1, lane2]
-    await ctx.send(f"{member.display_name} が `{lane1.upper()}` / `{lane2.upper()}` で参加登録しました。")
+    participants[guild_id][user_id] = list(preferred_lanes)
+    await ctx.send(f"{ctx.author.display_name} が {preferred_lanes} で参加登録しました。")
 
 
 
@@ -240,6 +242,9 @@ async def participants_list(ctx):
 
 
 
+@bot.command()
+async def debug_participants(ctx):
+    await ctx.send(f"ギルドID: {ctx.guild.id}\n参加者: {participants.get(ctx.guild.id, {})}")
 
 
 @bot.command()
