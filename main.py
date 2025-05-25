@@ -355,44 +355,45 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                 continue
 
     if not best_result:
-        await ctx.send("チーム分けに失敗しました。条件を緩和するか、参加者・能力値を見直してください。")
+        await ctx.send("チーム分けに失敗しました。条件を緩和するか、参加者の希望レーンや能力値を見直してください。")
         return
 
     team1_ids, team2_ids, role_map = best_result
 
-    def build_team_info(team_ids):
+    # チーム構成をメッセージに整形
+    def team_description(team_ids):
         lines = []
-        total = 0
         for uid in team_ids:
             member = ctx.guild.get_member(int(uid))
+            if not member:
+                continue
+            name = member.display_name
             lane = role_map[uid]
             ability = server_data[str(uid)][lane]
-            total += ability
-            lines.append(f"{member.display_name}（{lane.upper()}：{ability}）")
-        return lines, total
+            lines.append(f"{lane.upper()}: {name} ({ability})")
+        return '\n'.join(lines)
 
-    team_a_lines, team_a_total = build_team_info(team1_ids)
-    team_b_lines, team_b_total = build_team_info(team2_ids)
+    team_a_msg = team_description(team1_ids)
+    team_b_msg = team_description(team2_ids)
+    team_a_total = sum(server_data[str(uid)][role_map[uid]] for uid in team1_ids)
+    team_b_total = sum(server_data[str(uid)][role_map[uid]] for uid in team2_ids)
 
-    msg = "**Team A**（合計: {}）\n{}\n\n**Team B**（合計: {}）\n{}".format(
-        team_a_total,
-        "\n".join(team_a_lines),
-        team_b_total,
-        "\n".join(team_b_lines)
-    )
+    msg = f"**Team A (Total: {team_a_total})**\n{team_a_msg}\n\n"
+    msg += f"**Team B (Total: {team_b_total})**\n{team_b_msg}\n"
 
     if warnings:
-        warning_text = "\n".join(f"⚠ {w}" for w in warnings)
-        msg = f"{warning_text}\n\n{msg}"
+        msg += "\n⚠️ **警告**:\n" + "\n".join(warnings)
 
     await ctx.send(msg)
 
-    # 結果保存
-    current_teams[str(ctx.guild.id)] = {
-        "A": {uid: role_map[uid] for uid in team1_ids},
-        "B": {uid: role_map[uid] for uid in team2_ids}
+    # チーム情報保存
+    global last_teams
+    last_teams[str(guild_id)] = {
+        "team_a": {uid: role_map[uid] for uid in team1_ids},
+        "team_b": {uid: role_map[uid] for uid in team2_ids}
     }
-    save_data(team_file, current_teams)
+    save_data(team_file, last_teams)
+
 
 
     t1, t2, role_map = best_result
