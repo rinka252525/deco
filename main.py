@@ -22,7 +22,7 @@ match_history_file = 'match_history.json'
 participants = {}  # {guild_id: {user_id: [lane1, lane2]}} または ['fill']
 history_file = 'history.json'
 current_teams = {}
-last_teams = {}
+last_teams ={"team_a": {uid: lane}, "team_b": {uid: lane}}
 # Ability data structure example:
 # {
 #   "guild_id": {
@@ -470,47 +470,39 @@ async def win(ctx, result: str):
         await ctx.send("!win A または !win B の形式で入力してください。")
         return
 
-    abilities = load_data(ability_file)
-    history = load_data(history_file)
-
-    # 現在のチーム情報（保存されている前提）
-    current_teams = load_json(team_file)
-    if not current_teams or 'A' not in current_teams or 'B' not in current_teams:
+    guild_id = str(ctx.guild.id)
+    last_teams = load_data(team_file)
+    if guild_id not in last_teams or 'team_a' not in last_teams[guild_id] or 'team_b' not in last_teams[guild_id]:
         await ctx.send("直近のチーム情報が見つかりません。")
         return
 
-    winner_names = current_teams[result]
-    loser_names = current_teams['B' if result == 'A' else 'A']
+    abilities = load_data(ability_file)
+    history = load_data(history_file)
 
-    for names, is_win in [(winner_names, True), (loser_names, False)]:
-        for name in names:
-            # abilitiesとhistoryはuser_idで保持されている前提
-            user_id = None
-            for uid, info in abilities.items():
-                if info["name"] == name:
-                    user_id = uid
-                    break
-            if user_id is None:
-                continue  # スキップ
+    winners = last_teams[guild_id]['team_a'] if result == 'A' else last_teams[guild_id]['team_b']
+    losers = last_teams[guild_id]['team_b'] if result == 'A' else last_teams[guild_id]['team_a']
 
-            if user_id not in history:
-                history[user_id] = {'count': 0}
-            history[user_id]['count'] += 1
-            match_count = history[user_id]['count']
+    for team, is_win in [(winners, True), (losers, False)]:
+        for uid, lane in team.items():
+            if uid not in abilities:
+                continue
+            if uid not in history:
+                history[uid] = {'count': 0}
+            history[uid]['count'] += 1
+            match_count = history[uid]['count']
             delta = 10 if match_count <= 5 else 2
 
-            # 各レーンの能力値を更新（登録済みレーンすべて）
-            for lane in ['top', 'jg', 'mid', 'adc', 'sup']:
-                if lane in abilities[user_id]:
-                    current_value = abilities[user_id][lane]
-                    if is_win:
-                        abilities[user_id][lane] = current_value + delta
-                    else:
-                        abilities[user_id][lane] = max(0, current_value - delta)
+            # 勝者: +, 敗者: -
+            if lane in abilities[uid]:
+                if is_win:
+                    abilities[uid][lane] += delta
+                else:
+                    abilities[uid][lane] = max(0, abilities[uid][lane] - delta)
 
     save_data(ability_file, abilities)
     save_data(history_file, history)
-    await ctx.send(f"勝敗を記録しました。能力値を更新しました。")
+
+    await ctx.send("勝敗を記録し、能力値を更新しました。")
 
 
 
