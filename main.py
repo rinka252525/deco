@@ -214,18 +214,20 @@ async def leave(ctx, member: discord.Member = None):
 
 @bot.command()
 async def participants_list(ctx):
-    global participants
-    gid = ctx.guild.id
-    if gid not in participants or not participants[gid]:
+    server_id = str(ctx.guild.id)
+
+    if server_id not in participants or not participants[server_id]:
         await ctx.send("現在、参加者は登録されていません。")
         return
 
     msg = "**現在の参加者一覧：**\n"
-    for uid, pref in participants[gid].items():
+    for uid_str, pref in participants[server_id].items():
+        uid = int(uid_str)
         member = ctx.guild.get_member(uid)
         if not member:
             continue
-        msg += f"{member.display_name}：{', '.join(pref)}\n"
+        msg += f"{member.display_name}：{pref['lane1'].upper()} / {pref['lane2'].upper()}\n"
+
     await ctx.send(msg)
 
 
