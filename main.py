@@ -244,13 +244,11 @@ async def participants_list(ctx):
 
 @bot.command()
 async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
-    import json
-    from itertools import combinations, permutations
 
     guild_id = ctx.guild.id
     lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
-    if guild_id not in participants or len(participants[guild_id]) < 10:
+    if guild_id in participants or participants[guild_id] < 10:
         await ctx.send("参加者が10人未満です。")
         return
 
