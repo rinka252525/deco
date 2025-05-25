@@ -214,6 +214,7 @@ async def leave(ctx, member: discord.Member = None):
 
 @bot.command()
 async def participants_list(ctx):
+    global participants
     gid = ctx.guild.id
     if gid not in participants or not participants[gid]:
         await ctx.send("現在、参加者は登録されていません。")
