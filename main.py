@@ -248,6 +248,7 @@ async def participants_list(ctx):
 async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     guild_id = ctx.guild.id
     lanes = ['top', 'jg', 'mid', 'adc', 'sup']
+    global last_teams
 
     # ギルドIDがparticipantsに存在しない、または参加者が10人未満の場合は中断
     if guild_id not in participants or len(participants[guild_id]) < 10:
@@ -402,7 +403,7 @@ else:
     team_b_total = sum(server_data[str(uid)][role_map[uid]] for uid in team2_ids)
 
     # チーム情報を保存
-    global last_teams
+    
     last_teams[str(guild_id)] = {
         "team_a": {uid: role_map[uid] for uid in team1_ids},
         "team_b": {uid: role_map[uid] for uid in team2_ids}
@@ -535,6 +536,7 @@ async def win(ctx, winner: str):
 
     winner_key = "team_a" if result == 'A' else "team_b"
     loser_key = "team_b" if result == 'A' else "team_a"
+    
 
     winner = last_teams[guild_id][winner_key]
     loser = last_teams[guild_id][loser_key]
