@@ -429,6 +429,20 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 
 
 
+
+@bot.command()
+async def show_teams(ctx):
+    guild_id = str(ctx.guild.id)
+    last_teams = load_data(team_file)
+    if guild_id not in last_teams:
+        await ctx.send("チーム情報が存在しません。")
+        return
+        await ctx.invoke(bot.get_command("show_teams"))
+        
+
+    # チーム表示処理をここに再利用
+
+
 # !swap @user1 @user2
 @bot.command()
 async def swap(ctx, member1: discord.Member, member2: discord.Member):
@@ -461,7 +475,7 @@ async def swap(ctx, member1: discord.Member, member2: discord.Member):
 
     save_data(team_file, last_teams)
 
-    await ctx.send(f"{member1.display_name} と {member2.display_name} のレーンを入れ替えました。")
+    await ctx.invoke(bot.get_command("show_teams"))
 
 # !win A または !win B
 # 勝敗報告
