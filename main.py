@@ -356,8 +356,45 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                 continue
 
     if not best_result:
-        await ctx.send("チームを編成できませんでした。")
+        await ctx.send("チーム分けに失敗しました。条件を緩和するか、参加者・能力値を見直してください。")
         return
+
+    team1_ids, team2_ids, role_map = best_result
+
+    def build_team_info(team_ids):
+        lines = []
+        total = 0
+        for uid in team_ids:
+            member = ctx.guild.get_member(int(uid))
+            lane = role_map[uid]
+            ability = server_data[str(uid)][lane]
+            total += ability
+            lines.append(f"{member.display_name}（{lane.upper()}：{ability}）")
+        return lines, total
+
+    team_a_lines, team_a_total = build_team_info(team1_ids)
+    team_b_lines, team_b_total = build_team_info(team2_ids)
+
+    msg = "**Team A**（合計: {}）\n{}\n\n**Team B**（合計: {}）\n{}".format(
+        team_a_total,
+        "\n".join(team_a_lines),
+        team_b_total,
+        "\n".join(team_b_lines)
+    )
+
+    if warnings:
+        warning_text = "\n".join(f"⚠ {w}" for w in warnings)
+        msg = f"{warning_text}\n\n{msg}"
+
+    await ctx.send(msg)
+
+    # 結果保存
+    current_teams[str(ctx.guild.id)] = {
+        "A": {uid: role_map[uid] for uid in team1_ids},
+        "B": {uid: role_map[uid] for uid in team2_ids}
+    }
+    save_data(team_file, current_teams)
+
 
     t1, t2, role_map = best_result
     last_teams[guild_id] = {
