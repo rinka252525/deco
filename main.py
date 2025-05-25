@@ -178,17 +178,13 @@ async def join(ctx, *args):
         await ctx.send(f"指定されたレーンが無効です。\n有効なレーン: {', '.join(valid_lanes)}")
         return
 
-    server_id = str(ctx.guild.id)
-    if server_id not in participants:
-        participants[server_id] = {}
+    guild_id = str(ctx.guild.id)
+    if guild_id not in participants:
+        participants[guild_id] = {}
 
-    participants[server_id][str(member.id)] = {
-        'name': member.display_name,
-        'lane1': lane1,
-        'lane2': lane2
-    }
-
+    participants[guild_id][str(member.id)] = [lane1, lane2]
     await ctx.send(f"{member.display_name} が `{lane1.upper()}` / `{lane2.upper()}` で参加登録しました。")
+
 
 
 
@@ -198,37 +194,40 @@ async def join(ctx, *args):
 @bot.command()
 async def leave(ctx, member: discord.Member = None):
     global participants
-    server_id = str(ctx.guild.id)
+    guild_id = str(ctx.guild.id)
 
     if member is None:
         member = ctx.author  # メンションがなければ自分自身
 
-    if server_id not in participants or str(member.id) not in participants[server_id]:
+    if guild_id not in participants or str(member.id) not in participants[guild_id]:
         await ctx.send(f"{member.display_name} は参加していません。")
         return
 
-    del participants[server_id][str(member.id)]
+    del participants[guild_id][str(member.id)]
     await ctx.send(f"{member.display_name} の参加を解除しました。")
+
 
 
 
 @bot.command()
 async def participants_list(ctx):
-    server_id = str(ctx.guild.id)
+    guild_id = str(ctx.guild.id)
 
-    if server_id not in participants or not participants[server_id]:
+    if guild_id not in participants or not participants[guild_id]:
         await ctx.send("現在、参加者は登録されていません。")
         return
 
     msg = "**現在の参加者一覧：**\n"
-    for uid_str, pref in participants[server_id].items():
+    for uid_str, lanes in participants[guild_id].items():
         uid = int(uid_str)
         member = ctx.guild.get_member(uid)
         if not member:
             continue
-        msg += f"{member.display_name}：{pref['lane1'].upper()} / {pref['lane2'].upper()}\n"
+        lane1, lane2 = lanes
+        msg += f"{member.display_name}：{lane1.upper()} / {lane2.upper()}\n"
 
     await ctx.send(msg)
+
 
 
 
@@ -251,7 +250,7 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     guild_id = ctx.guild.id
     lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
-    if guild_id not in participants or len(participants[guild_id]) < 10:
+    if guild_id not in participants or len(participants[server_id]) < 10:
         await ctx.send("参加者が10人未満です。")
         return
 
