@@ -406,23 +406,23 @@ if best_result:
 
     save_json(team_file, last_teams)
 
-    msg = "**チームが決まりました！**\n"
-    msg += "**Team A**\n"
-    for uid in team1_ids:
-        member = ctx.guild.get_member(uid)
-        lane = role_map[uid]
-        val = server_data[str(uid)][lane]
-        msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
+   # msg = "**チームが決まりました！**\n"
+   # msg += "**Team A**\n"
+   # for uid in team1_ids:
+    #    member = ctx.guild.get_member(uid)
+   #     lane = role_map[uid]
+ #       val = server_data[str(uid)][lane]
+   #     msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
 
-    msg += "\n**Team B**\n"
-    for uid in team2_ids:
-        member = ctx.guild.get_member(uid)
-        lane = role_map[uid]
-        val = server_data[str(uid)][lane]
-        msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
+   # msg += "\n**Team B**\n"
+  #  for uid in team2_ids:
+   #     member = ctx.guild.get_member(uid)
+    #    lane = role_map[uid]
+    #    val = server_data[str(uid)][lane]
+    #    msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
 
-    if best_score >= 1000:
-        msg += "\n⚠️ 条件を完全には満たすチームは見つかりませんでしたが、最善の組み合わせを選びました。"
+   # if best_score >= 1000:
+      #  msg += "\n⚠️ 条件を完全には満たすチームは見つかりませんでしたが、最善の組み合わせを選びました。"
     #await ctx.send(msg)
 
     
