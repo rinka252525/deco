@@ -153,6 +153,8 @@ def format_teams(team_a, team_b):
 
 participants = {}  # グローバルで定義しておく
 
+participants = {}  # グローバル変数
+
 @bot.command()
 async def join(ctx, lane1: str = None, lane2: str = None):
     global participants
@@ -161,12 +163,14 @@ async def join(ctx, lane1: str = None, lane2: str = None):
         await ctx.send("希望レーンを2つ指定してください。例：`!join top mid`")
         return
 
-    lane1 = lane1.lower()
-    lane2 = lane2.lower()
+    # 入力の整形：小文字化＋前後の空白削除
+    lane1 = lane1.strip().lower()
+    lane2 = lane2.strip().lower()
+
     valid_lanes = ['top', 'jg', 'mid', 'adc', 'sup', 'fill']
 
     if lane1 not in valid_lanes or lane2 not in valid_lanes:
-        await ctx.send("指定されたレーンが無効です。有効なレーン: top, jg, mid, adc, sup, fill")
+        await ctx.send(f"指定されたレーンが無効です。\n有効なレーン: {', '.join(valid_lanes)}")
         return
 
     server_id = str(ctx.guild.id)
@@ -179,7 +183,8 @@ async def join(ctx, lane1: str = None, lane2: str = None):
         'lane2': lane2
     }
 
-    await ctx.send(f"{ctx.author.display_name} が {lane1.upper()} / {lane2.upper()} で参加登録しました。")
+    await ctx.send(f"{ctx.author.display_name} が `{lane1.upper()}` / `{lane2.upper()}` で参加登録しました。")
+
 
 
 
@@ -226,11 +231,11 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     guild_id = ctx.guild.id
     lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
-    if guild_id not in participants or len(participants[guild_id]) < 10:
+    if guild_id not in participants or len(participants[server_id]) < 10:
         await ctx.send("参加者が10人未満です。")
         return
 
-    member_ids = list(participants[guild_id].keys())
+    member_ids = list(participants[server_id].keys())
     server_data = get_server_data(guild_id)
 
     if not all(str(mid) in server_data for mid in member_ids):
@@ -262,7 +267,7 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                     try_role_map = role_map.copy()
                     success = True
                     for uid, lane in zip(team2_ids, team2_roles):
-                        prefs = participants[guild_id].get(uid, [])
+                        prefs = participants[server_id].get(uid, [])
                         if prefs and lane not in prefs and 'fill' not in prefs:
                             success = False
                             break
