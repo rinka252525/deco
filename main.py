@@ -275,7 +275,7 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
                 role_map = {}
                 assigned = set()
 
-from itertools import permutations
+#from itertools import permutations
 
 lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
