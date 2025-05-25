@@ -406,7 +406,6 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 
 # !swap @user1 @user2
 @bot.command()
-@bot.command()
 async def swap(ctx, member1: discord.Member, member2: discord.Member):
     last_teams = load_json(team_file)
     if not last_teams or 'A' not in last_teams or 'B' not in last_teams:
