@@ -250,7 +250,7 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     guild_id = ctx.guild.id
     lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
-    if guild_id not in participants or len(participants[server_id]) < 10:
+    if guild_id not in participants or len(participants[guild_id]) < 10:
         await ctx.send("参加者が10人未満です。")
         return
 
