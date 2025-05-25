@@ -172,6 +172,7 @@ async def join(ctx, *args):
 
     lane1 = args[0].lower()
     lane2 = args[1].lower()
+    preferred_lanes = [lane1, lane2]
 
     valid_lanes = ['top', 'jg', 'mid', 'adc', 'sup', 'fill']
     if lane1 not in valid_lanes or lane2 not in valid_lanes:
@@ -179,13 +180,14 @@ async def join(ctx, *args):
         return
 
     guild_id = ctx.guild.id
-    user_id = ctx.author.id
+    user_id = member.id
 
     if guild_id not in participants:
         participants[guild_id] = {}
 
-    participants[guild_id][user_id] = list(preferred_lanes)
-    await ctx.send(f"{ctx.author.display_name} が {preferred_lanes} で参加登録しました。")
+    participants[guild_id][user_id] = preferred_lanes
+    await ctx.send(f"{member.display_name} が {preferred_lanes} で参加登録しました。")
+
 
 
 
