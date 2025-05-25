@@ -106,6 +106,7 @@ async def ability(ctx, member: discord.Member, top: int, jg: int, mid: int, adc:
 
 
 
+
 @bot.command()
 async def delete_ability(ctx, member: discord.Member):
     server_data = get_server_data(ctx.guild.id)
@@ -154,18 +155,23 @@ def format_teams(team_a, team_b):
 
 
 @bot.command()
-async def join(ctx, member: discord.Member = None, lane1: str = None, lane2: str = None):
+async def join(ctx, *args):
     global participants
 
-    if member is None:
-        member = ctx.author  # メンションがない場合は実行者自身
-    if lane1 is None or lane2 is None:
+    # メンバーの特定
+    mentions = ctx.message.mentions
+    if mentions:
+        member = mentions[0]
+        args = args[1:]  # 最初のメンションを除く
+    else:
+        member = ctx.author
+
+    if len(args) != 2:
         await ctx.send("希望レーンを2つ指定してください。例：`!join @user top mid` または `!join top mid`")
         return
 
-    # 入力整形
-    lane1 = lane1.strip().lower()
-    lane2 = lane2.strip().lower()
+    lane1 = args[0].lower()
+    lane2 = args[1].lower()
 
     valid_lanes = ['top', 'jg', 'mid', 'adc', 'sup', 'fill']
     if lane1 not in valid_lanes or lane2 not in valid_lanes:
@@ -188,21 +194,22 @@ async def join(ctx, member: discord.Member = None, lane1: str = None, lane2: str
 
 
 
+
 @bot.command()
 async def leave(ctx, member: discord.Member = None):
     global participants
+    server_id = str(ctx.guild.id)
 
     if member is None:
-        member = ctx.author  # メンションがない場合は実行者自身
+        member = ctx.author  # メンションがなければ自分自身
 
-    server_id = str(ctx.guild.id)
-    user_id = str(member.id)
+    if server_id not in participants or str(member.id) not in participants[server_id]:
+        await ctx.send(f"{member.display_name} は参加していません。")
+        return
 
-    if server_id in participants and user_id in participants[server_id]:
-        del participants[server_id][user_id]
-        await ctx.send(f"{member.display_name} の参加登録を削除しました。")
-    else:
-        await ctx.send(f"{member.display_name} は参加登録されていません。")
+    del participants[server_id][str(member.id)]
+    await ctx.send(f"{member.display_name} の参加を解除しました。")
+
 
 
 @bot.command()
