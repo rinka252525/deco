@@ -458,12 +458,29 @@ else:
 
 @bot.command()
 async def show_teams(ctx):
-    guild_id = ctx.guild.id
     last_teams = load_json(team_file)
-    if guild_id not in last_teams:
-        await ctx.send("チーム情報が存在しません。")
+    if not last_teams or "team_a" not in last_teams or "team_b" not in last_teams:
+        await ctx.send("保存されたチームが見つかりません。")
         return
-        await ctx.invoke(bot.get_command("show_teams"))
+
+    guild_id = str(ctx.guild.id)
+    server_data = get_server_data(guild_id)
+
+    def format_team(team, name):
+        msg = f"**{name}**\n"
+        for uid, lane in team.items():
+            member = ctx.guild.get_member(int(uid))
+            if not member:
+                continue
+            val = server_data.get(uid, {}).get(lane, 0)
+            msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
+        return msg
+
+    msg = format_team(last_teams["team_a"], "Team A")
+    msg += "\n" + format_team(last_teams["team_b"], "Team B")
+
+    await ctx.send(msg)
+
         
 @bot.command()
 async def swap(ctx, member1: discord.Member, member2: discord.Member):
