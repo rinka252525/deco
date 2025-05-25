@@ -151,31 +151,37 @@ def format_teams(team_a, team_b):
 
 
 
+participants = {}  # グローバルで定義しておく
+
 @bot.command()
-async def join(ctx, *args):
-    gid = ctx.guild.id
-    if gid not in participants:
-        participants[gid] = {}
+async def join(ctx, lane1: str = None, lane2: str = None):
+    global participants
 
-    mentioned = ctx.message.mentions
-    lanes_input = [a.lower() for a in args if a.lower() not in [m.mention for m in mentioned]]
-
-    if not mentioned:
-        mentioned = [ctx.author]
-
-    if not lanes_input:
-        await ctx.send("希望レーンを2つ指定してください。例: `!join @user1 top mid` または `!join fill`")
+    if lane1 is None or lane2 is None:
+        await ctx.send("希望レーンを2つ指定してください。例：`!join top mid`")
         return
 
-    for user in mentioned:
-        if len(lanes_input) == 1 and lanes_input[0] == "fill":
-            participants[gid][user.id] = ["fill"]
-            await ctx.send(f"{user.display_name} を fill で参加登録しました。")
-        elif len(lanes_input) == 2:
-            participants[gid][user.id] = lanes_input
-            await ctx.send(f"{user.display_name} を {lanes_input[0]} と {lanes_input[1]} 希望で参加登録しました。")
-        else:
-            await ctx.send(f"{user.display_name} の登録に失敗しました。レーンは2つ、または 'fill' を指定してください。")
+    lane1 = lane1.lower()
+    lane2 = lane2.lower()
+    valid_lanes = ['top', 'jg', 'mid', 'adc', 'sup', 'fill']
+
+    if lane1 not in valid_lanes or lane2 not in valid_lanes:
+        await ctx.send("指定されたレーンが無効です。有効なレーン: top, jg, mid, adc, sup, fill")
+        return
+
+    server_id = str(ctx.guild.id)
+    if server_id not in participants:
+        participants[server_id] = {}
+
+    participants[server_id][str(ctx.author.id)] = {
+        'name': ctx.author.display_name,
+        'lane1': lane1,
+        'lane2': lane2
+    }
+
+    await ctx.send(f"{ctx.author.display_name} が {lane1.upper()} / {lane2.upper()} で参加登録しました。")
+
+
 
 @bot.command()
 async def leave(ctx, member: discord.Member = None):
@@ -346,43 +352,36 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     team2_sorted = sort_by_lane(last_teams[guild_id]["team2"])
 
     # 合計スコア計算
+        # 合計スコア計算
     def calc_team_score(team):
-        score = 0
-        for m, lane in team:
-            if isinstance(m, discord.Member):
-                uid = m.id
-                score += server_data[str(uid)][lane]
-        return score
+        total = 0
+        for member, lane in team:
+            user_data = server_data.get(str(member.id))
+            if user_data:
+                total += user_data.get(lane, 0)
+        return total
 
-    team1_score = calc_team_score(team1_sorted)
-    team2_score = calc_team_score(team2_sorted)
+    score1 = calc_team_score(team1_sorted)
+    score2 = calc_team_score(team2_sorted)
 
-    msg = "**チーム分け結果**\n"
+    def format_team(team, score):
+        lines = [f"**Total: {score}**"]
+        for member, lane in team:
+            val = server_data[str(member.id)][lane]
+            lines.append(f"{lane.upper()}: {member.display_name} ({val})")
+        return "\n".join(lines)
 
-    msg += f"\n**Team A**（合計スコア: {team1_score}）\n"
-    for m, lane in team1_sorted:
-        if isinstance(m, discord.Member):
-            uid = m.id
-            ability = server_data[str(uid)][lane]
-            msg += f"{m.display_name}（{lane}: {ability}）\n"
-        else:
-            msg += f"{m}（{lane}）\n"
-
-    msg += f"\n**Team B**（合計スコア: {team2_score}）\n"
-    for m, lane in team2_sorted:
-        if isinstance(m, discord.Member):
-            uid = m.id
-            ability = server_data[str(uid)][lane]
-            msg += f"{m.display_name}（{lane}: {ability}）\n"
-        else:
-            msg += f"{m}（{lane}）\n"
+    team_msg = "**チーム分け結果**\n\n"
+    team_msg += "__**Team A**__\n"
+    team_msg += format_team(team1_sorted, score1) + "\n\n"
+    team_msg += "__**Team B**__\n"
+    team_msg += format_team(team2_sorted, score2)
 
     if warnings:
-        msg += "\n⚠️ **警告**:\n"
-        for w in warnings:
-            msg += f"- {w}\n"
+        warning_msg = "\n⚠️ **警告**：以下の制限を超えています：\n" + "\n".join(warnings)
+        team_msg += warning_msg
 
-    # チーム構成を current_teams.json に保存
+        # チーム構成を current_teams.json に保存
     team_A = {lane: m.display_name if isinstance(m, discord.Member) else str(m)
               for m, lane in team1_sorted}
     team_B = {lane: m.display_name if isinstance(m, discord.Member) else str(m)
@@ -400,8 +399,7 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     with open("current_teams.json", "w", encoding="utf-8") as f:
         json.dump(current_teams, f, indent=4, ensure_ascii=False)
 
-    await ctx.send(msg)
-
+    await ctx.send(team_msg)
 
 
 # !swap @user1 @user2
