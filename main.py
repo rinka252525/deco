@@ -22,7 +22,8 @@ match_history_file = 'match_history.json'
 participants = {}  # {guild_id: {user_id: [lane1, lane2]}} または ['fill']
 history_file = 'history.json'
 current_teams = {}
-last_teams ={"team_a": {uid: lane}, "team_b": {uid: lane}}
+last_teams = {"team_a": {}, "team_b": {}}
+
 # Ability data structure example:
 # {
 #   "guild_id": {
