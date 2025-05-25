@@ -351,8 +351,6 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
         await ctx.send("チーム分けに失敗しました。条件を緩和するか、参加者の希望レーンや能力値を見直してください。")
         return
 
-    team1_ids, team2_ids, role_map = best_result
-
 if best_result:
     team1_ids, team2_ids, role_map = best_result
 
