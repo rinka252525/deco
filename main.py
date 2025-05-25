@@ -198,32 +198,32 @@ async def join(ctx, *args):
 @bot.command()
 async def leave(ctx, member: discord.Member = None):
     global participants
-    guild_id = str(ctx.guild.id)
+    guild_id = ctx.guild.id  # 修正: str() しない
 
     if member is None:
-        member = ctx.author  # メンションがなければ自分自身
+        member = ctx.author
 
-    if guild_id not in participants or str(member.id) not in participants[guild_id]:
+    if guild_id not in participants or member.id not in participants[guild_id]:
         await ctx.send(f"{member.display_name} は参加していません。")
         return
 
-    del participants[guild_id][str(member.id)]
+    del participants[guild_id][member.id]
     await ctx.send(f"{member.display_name} の参加を解除しました。")
+
 
 
 
 
 @bot.command()
 async def participants_list(ctx):
-    guild_id = str(ctx.guild.id)
+    guild_id = ctx.guild.id  # 修正: str() しない
 
     if guild_id not in participants or not participants[guild_id]:
         await ctx.send("現在、参加者は登録されていません。")
         return
 
     msg = "**現在の参加者一覧：**\n"
-    for uid_str, lanes in participants[guild_id].items():
-        uid = int(uid_str)
+    for uid, lanes in participants[guild_id].items():  # 修正: uid は int のままでOK
         member = ctx.guild.get_member(uid)
         if not member:
             continue
@@ -371,13 +371,13 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     team_a_total = sum(server_data[str(uid)][role_map[uid]] for uid in team1_ids)
     team_b_total = sum(server_data[str(uid)][role_map[uid]] for uid in team2_ids)
 
-    msg = f"**Team A (Total: {team_a_total})**\n{team_description(team1_ids)}\n\n"
-    msg += f"**Team B (Total: {team_b_total})**\n{team_description(team2_ids)}\n"
+   # msg = f"**Team A (Total: {team_a_total})**\n{team_description(team1_ids)}\n\n"
+   # msg += f"**Team B (Total: {team_b_total})**\n{team_description(team2_ids)}\n"
 
-    if warnings:
-        msg += "\n⚠️ **警告**:\n" + "\n".join(warnings)
+    #if warnings:
+        #msg += "\n⚠️ **警告**:\n" + "\n".join(warnings)
 
-    await ctx.send(msg)
+    #await ctx.send(msg)
 
     # チーム情報を保存
     global last_teams
