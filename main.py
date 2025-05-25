@@ -352,16 +352,16 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 
     team1_ids, team2_ids, role_map = best_result
 
-    if best_result:
+if best_result:
     team1_ids, team2_ids, role_map = best_result
 
     last_teams = {
         "team_a": {str(uid): role_map[uid] for uid in team1_ids},
         "team_b": {str(uid): role_map[uid] for uid in team2_ids},
-        "guild_id": str(ctx.guild.id)  # 保存しておくと他コマンドでも参照しやすい
+        "guild_id": str(ctx.guild.id)
     }
 
-    save_json(team_file, last_teams)  # ← ファイルへ保存
+    save_json(team_file, last_teams)
 
     msg = "**チームが決まりました！**\n"
     msg += "**Team A**\n"
@@ -384,6 +384,7 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     await ctx.send(msg)
 else:
     await ctx.send("条件を満たすチームが見つかりませんでした。")
+
     
 
     # 表示用フォーマット関数
