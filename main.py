@@ -167,7 +167,7 @@ async def join(ctx, *args):
         member = ctx.author
 
     if len(args) != 2:
-        await ctx.send("希望レーンを2つ指定してください。例：`!join @user top mid` または `!join top mid`")
+        await ctx.send("希望レーンを2つ指定してください。例：!join @user top mid または !join top mid")
         return
 
     lane1 = args[0].lower()
@@ -241,12 +241,6 @@ async def participants_list(ctx):
 
 
 
-
-
-
-@bot.command()
-async def debug_participants(ctx):
-    await ctx.send(f"ギルドID: {ctx.guild.id}\n参加者: {participants.get(ctx.guild.id, {})}")
 
 
 @bot.command()
@@ -437,28 +431,36 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 # !swap @user1 @user2
 @bot.command()
 async def swap(ctx, member1: discord.Member, member2: discord.Member):
-    last_teams = load_json(team_file)
-    if not last_teams or 'A' not in last_teams or 'B' not in last_teams:
+    guild_id = str(ctx.guild.id)
+    last_teams = load_data(team_file)
+
+    if guild_id not in last_teams or "team_a" not in last_teams[guild_id] or "team_b" not in last_teams[guild_id]:
         await ctx.send("直近のチームが存在しません。")
         return
-    name1 = member1.name
-    name2 = member2.name
-    all_players = last_teams['A'] + last_teams['B']
-    if name1 not in all_players or name2 not in all_players:
+
+    all_teams = {**last_teams[guild_id]['team_a'], **last_teams[guild_id]['team_b']}
+    uid1 = str(member1.id)
+    uid2 = str(member2.id)
+
+    if uid1 not in all_teams or uid2 not in all_teams:
         await ctx.send("指定したメンバーがチームにいません。")
         return
-    for team in ['A', 'B']:
-        if name1 in last_teams[team]:
-            last_teams[team].remove(name1)
-            last_teams[team].append(name2)
-        elif name2 in last_teams[team]:
-            last_teams[team].remove(name2)
-            last_teams[team].append(name1)
-    save_json(team_file, last_teams)
-    abilities = load_json(ability_file)
-    team_a = [(p, abilities[p]) for p in last_teams['A']]
-    team_b = [(p, abilities[p]) for p in last_teams['B']]
-    await ctx.send("入れ替え後のチーム:\n" + format_teams(team_a, team_b))
+
+    # レーンを入れ替える
+    lane1 = all_teams[uid1]
+    lane2 = all_teams[uid2]
+
+    for team_key in ['team_a', 'team_b']:
+        if uid1 in last_teams[guild_id][team_key]:
+            last_teams[guild_id][team_key][uid2] = lane1
+            del last_teams[guild_id][team_key][uid1]
+        if uid2 in last_teams[guild_id][team_key]:
+            last_teams[guild_id][team_key][uid1] = lane2
+            del last_teams[guild_id][team_key][uid2]
+
+    save_data(team_file, last_teams)
+
+    await ctx.send(f"{member1.display_name} と {member2.display_name} のレーンを入れ替えました。")
 
 # !win A または !win B
 # 勝敗報告
