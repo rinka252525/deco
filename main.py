@@ -355,35 +355,9 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                 print(f"make_teams exception: {e}")
                 continue
 
-        if not best_result:
+    if not best_result:
         await ctx.send("チームを編成できませんでした。")
         return
-
-    team1_ids, team2_ids, role_map = best_result
-
-    team1 = [(ctx.guild.get_member(int(uid)).display_name, {
-        role_map[uid]: server_data[uid][role_map[uid]]
-    }) for uid in team1_ids]
-
-    team2 = [(ctx.guild.get_member(int(uid)).display_name, {
-        role_map[uid]: server_data[uid][role_map[uid]]
-    }) for uid in team2_ids]
-
-    msg = format_teams(team1, team2)
-
-    if warnings:
-        warning_msg = "\n⚠️ **警告** ⚠️\n" + "\n".join(warnings) + "\n\n"
-        msg = warning_msg + msg
-
-    await ctx.send(msg)
-
-    # チーム情報を保存
-    last_teams[str(ctx.guild.id)] = {
-        "teamA": {uid: role_map[uid] for uid in team1_ids},
-        "teamB": {uid: role_map[uid] for uid in team2_ids}
-    }
-    save_data(team_file, last_teams)
-
 
     t1, t2, role_map = best_result
     last_teams[guild_id] = {
