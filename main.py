@@ -477,6 +477,60 @@ async def swap(ctx, member1: discord.Member, member2: discord.Member):
 
     await ctx.invoke(bot.get_command("show_teams"))
 
+
+@bot.command()
+async def swap2(ctx, member1: discord.Member, member2: discord.Member):
+    guild_id = ctx.guild.id
+    user1_id = str(member1.id)
+    user2_id = str(member2.id)
+
+    if guild_id not in current_teams:
+        await ctx.send("現在チームが編成されていません。")
+        return
+
+    teams = current_teams[guild_id]
+    team_a = teams["team_a"]
+    team_b = teams["team_b"]
+
+    # 所属チームを確認
+    team1 = team2 = None
+    for lane, uid in team_a.items():
+        if uid == user1_id:
+            team1 = ("team_a", lane)
+        elif uid == user2_id:
+            team2 = ("team_a", lane)
+    for lane, uid in team_b.items():
+        if uid == user1_id:
+            team1 = ("team_b", lane)
+        elif uid == user2_id:
+            team2 = ("team_b", lane)
+
+    if not team1 or not team2:
+        await ctx.send("2人とも現在のチームにいないか、レーンが不明です。")
+        return
+    if team1[0] == team2[0]:
+        await ctx.send("同じチーム内でのスワップはできません。")
+        return
+
+    # チーム間スワップを実行
+    teams[team1[0]][team1[1]] = user2_id
+    teams[team2[0]][team2[1]] = user1_id
+
+    # 保存
+    current_teams[guild_id] = teams
+
+    await ctx.send(f"{member1.display_name} と {member2.display_name} のレーンを入れ替えました。")
+
+    # 表示用整形
+    def mention(uid):
+        return f"<@{uid}>"
+
+    msg = "**チーム編成（スワップ後）**\n"
+    msg += "**Team A**\n" + "\n".join(f"{lane}: {mention(uid)}" for lane, uid in teams["team_a"].items()) + "\n"
+    msg += "**Team B**\n" + "\n".join(f"{lane}: {mention(uid)}" for lane, uid in teams["team_b"].items()) + "\n"
+    await ctx.send(msg)
+
+
 # !win A または !win B
 # 勝敗報告
 @bot.command()
@@ -518,6 +572,64 @@ async def win(ctx, result: str):
     save_data(history_file, history)
 
     await ctx.send("勝敗を記録し、能力値を更新しました。")
+
+@bot.command()
+async def win2(ctx, winner: str):
+    winner = winner.upper()
+    guild_id = str(ctx.guild.id)
+    data = load_data(ability_file)
+
+    if guild_id not in current_teams:
+        await ctx.send("現在チームが設定されていません。")
+        return
+
+    if winner not in ['A', 'B']:
+        await ctx.send("勝利チームは A または B で指定してください。例: `!win A`")
+        return
+
+    teams = current_teams[guild_id]
+    team_a = teams["team_a"]
+    team_b = teams["team_b"]
+
+    win_team = team_a if winner == 'A' else team_b
+    lose_team = team_b if winner == 'A' else team_a
+
+    result_msg = ""
+
+    for team, is_winner in [(win_team, True), (lose_team, False)]:
+        for lane, uid in team.items():
+            uid_str = str(uid)
+            if uid_str not in data[guild_id]:
+                continue
+            user_data = data[guild_id][uid_str]
+            current_value = user_data.get(lane, 0)
+
+            # 試合数を確認
+            if "matches" not in user_data:
+                user_data["matches"] = {l: 0 for l in lanes}
+            if "custom_history" not in user_data:
+                user_data["custom_history"] = []
+
+            match_count = user_data["matches"].get(lane, 0)
+            change = 10 if match_count < 5 else 2
+            if not is_winner:
+                change *= -1
+
+            new_value = max(0, current_value + change)
+            user_data[lane] = new_value
+            user_data["matches"][lane] = match_count + 1
+
+            user_data["custom_history"].append({
+                "lane": lane,
+                "result": "win" if is_winner else "lose",
+                "change": change
+            })
+
+            result_msg += f"<@{uid}> {lane.upper()}: {current_value} → {new_value} ({'勝利' if is_winner else '敗北'})\n"
+
+    save_data(ability_file, data)
+    await ctx.send(f"**試合結果：Team {winner} 勝利**\n{result_msg}")
+
 
 
 
