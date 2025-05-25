@@ -383,8 +383,6 @@ if best_result:
         msg += "\n⚠️ 条件を完全には満たすチームは見つかりませんでしたが、最善の組み合わせを選びました。"
 
     await ctx.send(msg)
-else:
-    await ctx.send("条件を満たすチームが見つかりませんでした。")
 
     
 
