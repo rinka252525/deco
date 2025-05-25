@@ -245,14 +245,17 @@ async def participants_list(ctx):
 
 @bot.command()
 async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
+    import json
+    from itertools import combinations, permutations
+
     guild_id = ctx.guild.id
     lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
-    if guild_id not in participants or len(participants[server_id]) < 10:
+    if guild_id not in participants or len(participants[guild_id]) < 10:
         await ctx.send("参加者が10人未満です。")
         return
 
-    member_ids = list(participants[server_id].keys())
+    member_ids = list(participants[guild_id].keys())
     server_data = get_server_data(guild_id)
 
     if not all(str(mid) in server_data for mid in member_ids):
@@ -278,13 +281,13 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                     role_map[uid] = lane
                     assigned.add(lane)
 
-                                # チーム2のロール割り当て（Team Bも5ロール固定で割り当てる）
+                # チーム2のロール割り当て
                 valid = False
                 for team2_roles in permutations(lanes):
                     try_role_map = role_map.copy()
                     success = True
                     for uid, lane in zip(team2_ids, team2_roles):
-                        prefs = participants[server_id].get(uid, [])
+                        prefs = participants[guild_id].get(uid, [])
                         if prefs and lane not in prefs and 'fill' not in prefs:
                             success = False
                             break
@@ -294,11 +297,7 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                         valid = True
                         break
 
-                if not valid:
-                    continue  # この組み合わせはスキップ
-
-
-                if len(role_map) != 10:
+                if not valid or len(role_map) != 10:
                     continue
 
                 team1_score = 0
@@ -356,9 +355,35 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                 print(f"make_teams exception: {e}")
                 continue
 
-    if not best_result:
+        if not best_result:
         await ctx.send("チームを編成できませんでした。")
         return
+
+    team1_ids, team2_ids, role_map = best_result
+
+    team1 = [(ctx.guild.get_member(int(uid)).display_name, {
+        role_map[uid]: server_data[uid][role_map[uid]]
+    }) for uid in team1_ids]
+
+    team2 = [(ctx.guild.get_member(int(uid)).display_name, {
+        role_map[uid]: server_data[uid][role_map[uid]]
+    }) for uid in team2_ids]
+
+    msg = format_teams(team1, team2)
+
+    if warnings:
+        warning_msg = "\n⚠️ **警告** ⚠️\n" + "\n".join(warnings) + "\n\n"
+        msg = warning_msg + msg
+
+    await ctx.send(msg)
+
+    # チーム情報を保存
+    last_teams[str(ctx.guild.id)] = {
+        "teamA": {uid: role_map[uid] for uid in team1_ids},
+        "teamB": {uid: role_map[uid] for uid in team2_ids}
+    }
+    save_data(team_file, last_teams)
+
 
     t1, t2, role_map = best_result
     last_teams[guild_id] = {
@@ -366,15 +391,12 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
         "team2": [(ctx.guild.get_member(uid) or f"Unknown User {uid}", role_map[uid]) for uid in t2],
     }
 
-    # 並び替え関数
     def sort_by_lane(team):
         return sorted(team, key=lambda x: lanes.index(x[1]))
 
     team1_sorted = sort_by_lane(last_teams[guild_id]["team1"])
     team2_sorted = sort_by_lane(last_teams[guild_id]["team2"])
 
-    # 合計スコア計算
-        # 合計スコア計算
     def calc_team_score(team):
         total = 0
         for member, lane in team:
@@ -403,15 +425,17 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
         warning_msg = "\n⚠️ **警告**：以下の制限を超えています：\n" + "\n".join(warnings)
         team_msg += warning_msg
 
-        # チーム構成を current_teams.json に保存
+    # チーム名のリストを定義して保存
+    team_a_names = [m.display_name if isinstance(m, discord.Member) else str(m) for m, _ in team1_sorted]
+    team_b_names = [m.display_name if isinstance(m, discord.Member) else str(m) for m, _ in team2_sorted]
+    teams = {'A': team_a_names, 'B': team_b_names}
+    save_json(team_file, teams)
+
+    # 現在のチーム構成を保存
     team_A = {lane: m.display_name if isinstance(m, discord.Member) else str(m)
               for m, lane in team1_sorted}
     team_B = {lane: m.display_name if isinstance(m, discord.Member) else str(m)
               for m, lane in team2_sorted}
-
-    # 例: make_teams コマンドの中
-    teams = {'A': team_a_names, 'B': team_b_names}
-    save_json(team_file, teams)
 
     current_teams = {
         'A': team_A,
@@ -422,6 +446,7 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
         json.dump(current_teams, f, indent=4, ensure_ascii=False)
 
     await ctx.send(team_msg)
+
 
 
 # !swap @user1 @user2
