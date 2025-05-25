@@ -244,17 +244,18 @@ async def participants_list(ctx):
 
 @bot.command()
 async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
-
     guild_id = ctx.guild.id
     lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
-    if guild_id in participants or participants[guild_id] < 10:
+    # ギルドIDがparticipantsに存在しない、または参加者が10人未満の場合は中断
+    if guild_id not in participants or len(participants[guild_id]) < 10:
         await ctx.send("参加者が10人未満です。")
         return
 
     member_ids = list(participants[guild_id].keys())
     server_data = get_server_data(guild_id)
 
+    # 能力値未登録のメンバーがいる場合は中断
     if not all(str(mid) in server_data for mid in member_ids):
         unregistered_ids = [mid for mid in member_ids if str(mid) not in server_data]
         mention_list = ', '.join(f'<@{uid}>' for uid in unregistered_ids)
@@ -278,7 +279,7 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                     role_map[uid] = lane
                     assigned.add(lane)
 
-                # チーム2のロール割り当て
+                # チーム2のロール割り当て（希望レーン考慮）
                 valid = False
                 for team2_roles in permutations(lanes):
                     try_role_map = role_map.copy()
@@ -297,28 +298,19 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
                 if not valid or len(role_map) != 10:
                     continue
 
+                # チームスコアと差分評価
                 team1_score = 0
                 team2_score = 0
                 total_lane_diff = 0
                 exceeded = False
 
                 for lane in lanes:
-                    uid1 = [u for u in team1_ids if role_map[u] == lane]
-                    uid2 = [u for u in team2_ids if role_map[u] == lane]
-
-                    if not uid1 or not uid2:
-                        exceeded = True
-                        break
-
-                    uid1 = uid1[0]
-                    uid2 = uid2[0]
-
+                    uid1 = [u for u in team1_ids if role_map[u] == lane][0]
+                    uid2 = [u for u in team2_ids if role_map[u] == lane][0]
                     val1 = server_data[str(uid1)][lane]
                     val2 = server_data[str(uid2)][lane]
-
                     team1_score += val1
                     team2_score += val2
-
                     diff = abs(val1 - val2)
                     total_lane_diff += diff
                     if diff > lane_diff:
@@ -358,33 +350,29 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
 
     team1_ids, team2_ids, role_map = best_result
 
-    # チーム構成をメッセージに整形
+    # 表示用フォーマット関数
     def team_description(team_ids):
         lines = []
         for uid in team_ids:
-            member = ctx.guild.get_member(int(uid))
-            if not member:
-                continue
-            name = member.display_name
+            member = ctx.guild.get_member(uid)
+            name = member.display_name if member else f"User {uid}"
             lane = role_map[uid]
             ability = server_data[str(uid)][lane]
             lines.append(f"{lane.upper()}: {name} ({ability})")
         return '\n'.join(lines)
 
-    team_a_msg = team_description(team1_ids)
-    team_b_msg = team_description(team2_ids)
     team_a_total = sum(server_data[str(uid)][role_map[uid]] for uid in team1_ids)
     team_b_total = sum(server_data[str(uid)][role_map[uid]] for uid in team2_ids)
 
-    msg = f"**Team A (Total: {team_a_total})**\n{team_a_msg}\n\n"
-    msg += f"**Team B (Total: {team_b_total})**\n{team_b_msg}\n"
+    msg = f"**Team A (Total: {team_a_total})**\n{team_description(team1_ids)}\n\n"
+    msg += f"**Team B (Total: {team_b_total})**\n{team_description(team2_ids)}\n"
 
     if warnings:
         msg += "\n⚠️ **警告**:\n" + "\n".join(warnings)
 
     await ctx.send(msg)
 
-    # チーム情報保存
+    # チーム情報を保存
     global last_teams
     last_teams[str(guild_id)] = {
         "team_a": {uid: role_map[uid] for uid in team1_ids},
@@ -392,27 +380,17 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     }
     save_data(team_file, last_teams)
 
-
-
-    t1, t2, role_map = best_result
-    last_teams[guild_id] = {
-        "team1": [(ctx.guild.get_member(uid) or f"Unknown User {uid}", role_map[uid]) for uid in t1],
-        "team2": [(ctx.guild.get_member(uid) or f"Unknown User {uid}", role_map[uid]) for uid in t2],
-    }
-
+    # 名前付き情報も保存
     def sort_by_lane(team):
         return sorted(team, key=lambda x: lanes.index(x[1]))
 
-    team1_sorted = sort_by_lane(last_teams[guild_id]["team1"])
-    team2_sorted = sort_by_lane(last_teams[guild_id]["team2"])
+    team1_named = [(ctx.guild.get_member(uid), role_map[uid]) for uid in team1_ids]
+    team2_named = [(ctx.guild.get_member(uid), role_map[uid]) for uid in team2_ids]
+    team1_sorted = sort_by_lane(team1_named)
+    team2_sorted = sort_by_lane(team2_named)
 
     def calc_team_score(team):
-        total = 0
-        for member, lane in team:
-            user_data = server_data.get(str(member.id))
-            if user_data:
-                total += user_data.get(lane, 0)
-        return total
+        return sum(server_data[str(m.id)][lane] for m, lane in team if m)
 
     score1 = calc_team_score(team1_sorted)
     score2 = calc_team_score(team2_sorted)
@@ -420,41 +398,32 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     def format_team(team, score):
         lines = [f"**Total: {score}**"]
         for member, lane in team:
-            val = server_data[str(member.id)][lane]
-            lines.append(f"{lane.upper()}: {member.display_name} ({val})")
+            if member:
+                val = server_data[str(member.id)][lane]
+                lines.append(f"{lane.upper()}: {member.display_name} ({val})")
         return "\n".join(lines)
 
-    team_msg = "**チーム分け結果**\n\n"
-    team_msg += "__**Team A**__\n"
-    team_msg += format_team(team1_sorted, score1) + "\n\n"
-    team_msg += "__**Team B**__\n"
-    team_msg += format_team(team2_sorted, score2)
+    team_msg = "**チーム分け結果（再表示）**\n\n"
+    team_msg += "__**Team A**__\n" + format_team(team1_sorted, score1) + "\n\n"
+    team_msg += "__**Team B**__\n" + format_team(team2_sorted, score2)
 
     if warnings:
-        warning_msg = "\n⚠️ **警告**：以下の制限を超えています：\n" + "\n".join(warnings)
-        team_msg += warning_msg
-
-    # チーム名のリストを定義して保存
-    team_a_names = [m.display_name if isinstance(m, discord.Member) else str(m) for m, _ in team1_sorted]
-    team_b_names = [m.display_name if isinstance(m, discord.Member) else str(m) for m, _ in team2_sorted]
-    teams = {'A': team_a_names, 'B': team_b_names}
-    save_json(team_file, teams)
-
-    # 現在のチーム構成を保存
-    team_A = {lane: m.display_name if isinstance(m, discord.Member) else str(m)
-              for m, lane in team1_sorted}
-    team_B = {lane: m.display_name if isinstance(m, discord.Member) else str(m)
-              for m, lane in team2_sorted}
-
-    current_teams = {
-        'A': team_A,
-        'B': team_B
-    }
-
-    with open("current_teams.json", "w", encoding="utf-8") as f:
-        json.dump(current_teams, f, indent=4, ensure_ascii=False)
+        team_msg += "\n⚠️ **警告**:\n" + "\n".join(warnings)
 
     await ctx.send(team_msg)
+
+    # JSON保存
+    teams = {
+        'A': [m.display_name for m, _ in team1_sorted if m],
+        'B': [m.display_name for m, _ in team2_sorted if m]
+    }
+    save_json(team_file, teams)
+
+    with open("current_teams.json", "w", encoding="utf-8") as f:
+        json.dump({
+            'A': {lane: m.display_name for m, lane in team1_sorted if m},
+            'B': {lane: m.display_name for m, lane in team2_sorted if m}
+        }, f, indent=4, ensure_ascii=False)
 
 
 
