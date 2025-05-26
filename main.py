@@ -667,7 +667,7 @@ async def help_command(ctx):
 !win A / B - 勝利チーム報告 → 能力値変動
 
 !ranking - 各レーンの能力値ランキング
-!show_custom　@user - 各個人のカスタム勝率
+!show_custom @user - 各個人のカスタム勝率
 
 """)
 
