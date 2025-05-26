@@ -491,56 +491,74 @@ async def swap(ctx, member1: discord.Member, member2: discord.Member):
 
 @bot.command()
 async def win(ctx, winner: str):
-    data_file = "data.json"  # ← 追加
+    ability_file = 'abilities.json'
+    team_file = 'last_teams.json'
+    history_file = 'history.json'
+
     winner = winner.upper()
     if winner not in ["A", "B"]:
         await ctx.send("勝者は A または B で指定してください。")
         return
 
     guild_id = str(ctx.guild.id)
-    last_teams = load_json(team_file)
+    last_teams_data = load_data(team_file)
 
-    if not last_teams or guild_id not in last_teams or "team_a" not in last_teams[guild_id]:
+    if guild_id not in last_teams_data or "team_a" not in last_teams_data[guild_id] or "team_b" not in last_teams_data[guild_id]:
         await ctx.send("直近のチームデータが見つかりません。")
         return
 
-    server_data = get_server_data(guild_id)
-    history_data = load_json("history.json")
+    # abilities.json を読み込む
+    ability_data = load_data(ability_file)
+    if guild_id not in ability_data:
+        await ctx.send("能力値データが見つかりません。")
+        return
+    guild_abilities = ability_data[guild_id]
 
+    # 履歴データ
+    history_data = load_data(history_file)
+
+    # 勝者・敗者を取得
     winner_key = "team_a" if winner == 'A' else "team_b"
     loser_key = "team_b" if winner == 'A' else "team_a"
 
-    team_win = last_teams[guild_id][winner_key]
-    team_lose = last_teams[guild_id][loser_key]
+    team_win = last_teams_data[guild_id][winner_key]
+    team_lose = last_teams_data[guild_id][loser_key]
 
     def update_ability(uid, lane, is_winner, match_count):
         delta = 10 if match_count < 5 else 2
-        ability = server_data[uid][lane]
+        current_ability = guild_abilities[uid].get(lane, 60)
         if is_winner:
-            server_data[uid][lane] = min(120, ability + delta)
+            guild_abilities[uid][lane] = min(120, current_ability + delta)
         else:
-            server_data[uid][lane] = max(0, ability - delta)
+            guild_abilities[uid][lane] = max(0, current_ability - delta)
 
     def update_history(uid, lane, is_winner):
         if uid not in history_data:
             history_data[uid] = {"total_win": 0, "total_lose": 0, "lanes": {}}
-        history_data[uid]["total_win" if is_winner else "total_lose"] += 1
         if lane not in history_data[uid]["lanes"]:
             history_data[uid]["lanes"][lane] = {"win": 0, "lose": 0}
-        history_data[uid]["lanes"][lane]["win" if is_winner else "lose"] += 1
+        if is_winner:
+            history_data[uid]["total_win"] += 1
+            history_data[uid]["lanes"][lane]["win"] += 1
+        else:
+            history_data[uid]["total_lose"] += 1
+            history_data[uid]["lanes"][lane]["lose"] += 1
 
+    # 勝者と敗者チームの処理
     for team, is_winner in [(team_win, True), (team_lose, False)]:
-        for uid_str, lane in team.items():
-            if uid_str not in server_data or lane not in server_data[uid_str]:
+        for uid, lane in team.items():
+            if uid not in guild_abilities or lane not in guild_abilities[uid]:
                 continue
-            history = history_data.get(uid_str, {})
-            match_count = history.get("total_win", 0) + history.get("total_lose", 0)
-            update_ability(uid_str, lane, is_winner, match_count)
-            update_history(uid_str, lane, is_winner)
+            match_count = history_data.get(uid, {}).get("total_win", 0) + history_data.get(uid, {}).get("total_lose", 0)
+            update_ability(uid, lane, is_winner, match_count)
+            update_history(uid, lane, is_winner)
 
-    save_data(data_file, server_data)  # ← これでOK
-    save_data("history.json", history_data)
+    # 保存
+    save_data(ability_file, ability_data)
+    save_data(history_file, history_data)
+
     await ctx.send(f"チーム{winner} の勝利を記録しました。能力値と戦績を更新しました。")
+
 
 
 
