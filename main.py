@@ -392,7 +392,7 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
         val = server_data[str(member.id)][lane]
         msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
 
-    msg += "\n**Team B**（合計: {team2_total}\n"
+    msg += "\n**Team B**（合計: {team2_total}) \n"
     for member, lane in team2_sorted:
         val = server_data[str(member.id)][lane]
         msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
