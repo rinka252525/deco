@@ -246,7 +246,7 @@ async def participants_list(ctx):
 
 
 @bot.command()
-async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
+async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     guild_id = ctx.guild.id
     lanes = ['top', 'jg', 'mid', 'adc', 'sup']
     global last_teams
@@ -361,7 +361,10 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
     team1_ids, team2_ids, role_map = best_result
 
     # 最終チーム保存
-    last_teams = {
+    last_teams = load_json(team_file)
+    if not last_teams*
+        last teams = {}
+    last_teams[str(ctx.guild.id)] = {
         "team_a": {str(uid): role_map[uid] for uid in team1_ids},
         "team_b": {str(uid): role_map[uid] for uid in team2_ids},
         "guild_id": str(ctx.guild.id)
