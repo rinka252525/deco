@@ -188,7 +188,7 @@ async def join(ctx, *args):
 
     participants[guild_id][user_id] = preferred_lanes
     lanes_str = f"{lane1.upper()} / {lane2.upper()}" if lane1 != lane2 else lane1.upper()
-    await ctx.send(f"{member.display_name} が {preferred_lanes} で参加登録しました。")
+    await ctx.send(f"{member.display_name} が [{lane_str}] で参加登録しました。")
 
 
 
