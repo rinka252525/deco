@@ -576,32 +576,34 @@ async def win(ctx, winner: str):
 
 
 @bot.command()
-async def show_custom(ctx):
-    server_data = get_server_data(ctx.guild.id)
-    if not server_data:
-        await ctx.send("データが存在しません。")
+async def show_custom(ctx, member: discord.Member = None):
+    history_data = load_data("history.json")
+    member = member or ctx.author
+    uid = str(member.id)
+
+    if uid not in history_data:
+        await ctx.send(f"{member.display_name} のカスタム戦績は記録されていません。")
         return
 
-    msg = "**📘 各プレイヤーのカスタム戦績**\n"
-    for uid, stats in server_data.items():
-        member = ctx.guild.get_member(int(uid))
-        if not member:
-            continue
+    user_history = history_data[uid]
+    total_win = user_history.get("total_win", 0)
+    total_lose = user_history.get("total_lose", 0)
+    total_games = total_win + total_lose
 
-        msg += f"\n🔹 {member.display_name}\n"
-        history = stats.get("custom_history", [])
-        if not history:
-            msg += "　記録なし\n"
-            continue
+    msg = f"**📘 {member.display_name} のカスタム戦績**\n"
+    msg += f"🔹 合計: {total_games}戦 {total_win}勝 {total_lose}敗　勝率 {round((total_win / total_games) * 100, 1) if total_games else 0}%\n"
 
-        lane_histories = {}
-        for entry in history:
-            lane_histories.setdefault(entry['lane'], []).append(entry)
-
-        for lane, records in lane_histories.items():
-            msg += f"　- {lane}: " + ", ".join([f"{r['result']}({r['change']:+})" for r in records]) + "\n"
+    lanes = ["top", "jg", "mid", "adc", "sup"]
+    for lane in lanes:
+        lane_data = user_history.get("lanes", {}).get(lane, {"win": 0, "lose": 0})
+        win = lane_data["win"]
+        lose = lane_data["lose"]
+        total = win + lose
+        rate = f"{round((win / total) * 100, 1)}%" if total else "0%"
+        msg += f"　- {lane}: {total}戦 {win}勝 {lose}敗　勝率 {rate}\n"
 
     await ctx.send(msg)
+
 
 # bot.run(...) は既に実行中のコードで保持
 # 他のコマンドとの統合が必要な場合はお知らせください。
