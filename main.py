@@ -648,7 +648,7 @@ async def reset(ctx):
 
 
 
-@bot.command(name="help_baron")
+@bot.command(name="help_bb")
 async def help_command(ctx):
     await ctx.send("""
 📘 Botコマンド一覧
