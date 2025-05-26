@@ -433,7 +433,6 @@ if best_result:
 
     if warnings:
         team_msg += "\n⚠️ **警告**:\n" + "\n".join(warnings)
-
         await ctx.send(team_msg)
 
     # JSON保存
