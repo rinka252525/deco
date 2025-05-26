@@ -657,7 +657,7 @@ async def help_command(ctx):
 !delete_ability @user - 能力値削除
 !show_ability - 能力値確認
 
-!join top mid / !join fill - レーン希望で参加（2つ or fill）
+!join top mid / fill fill - レーン希望で参加（2つ or fill）
 !leave @user - 参加リストから削除
 !participants_list - 参加者リスト
 !reset - 参加者すべて削除
