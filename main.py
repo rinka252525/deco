@@ -688,15 +688,15 @@ async def help_command(ctx):
 !leave @user - 参加リストから削除
 !participants_list - 参加者リスト
 !reset - 参加者すべて削除
+
 !make_teams 20 50 - チーム分け（VC不要・参加者10人）
 !swap @user @user - レーン交換
+!win A / B - 勝利チーム報告 → 能力値変動
 
 !show - 能力一覧
 !ranking - 各レーンの能力値ランキング
-!win A / B - 勝利チーム報告 → 能力値変動
-
 !show_custom - 各個人のカスタム勝率
-!history - カスタム結果
+
 """)
 
 bot.run(os.environ['DISCORD_BOT_TOKEN'])
