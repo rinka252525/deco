@@ -487,12 +487,13 @@ async def swap(ctx, member1: discord.Member, member2: discord.Member):
 
 @bot.command()
 async def win(ctx, winner: str):
+    data_file = "data.json"  # ← 追加
     winner = winner.upper()
     if winner not in ["A", "B"]:
         await ctx.send("勝者は A または B で指定してください。")
         return
 
-    guild_id = str(ctx.guild.id)  # 先に定義する
+    guild_id = str(ctx.guild.id)
     last_teams = load_json(team_file)
 
     if not last_teams or guild_id not in last_teams or "team_a" not in last_teams[guild_id]:
@@ -533,9 +534,10 @@ async def win(ctx, winner: str):
             update_ability(uid_str, lane, is_winner, match_count)
             update_history(uid_str, lane, is_winner)
 
-    save_data(data_file, server_data)
+    save_data(data_file, server_data)  # ← これでOK
     save_data("history.json", history_data)
     await ctx.send(f"チーム{winner} の勝利を記録しました。能力値と戦績を更新しました。")
+
 
 
 
