@@ -563,6 +563,12 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
     if best_result:
         team1_ids, team2_ids, role_map = best_result
 
+        teams = {
+            'A': [m.display_name for m, _ in team1_sorted if m],
+            'B': [m.display_name for m, _ in team2_sorted if m]
+        }
+        save_json("teams_display.json", teams)
+
         last_teams = {
             "team_a": {str(uid): role_map[uid] for uid in team1_ids},
             "team_b": {str(uid): role_map[uid] for uid in team2_ids},
@@ -650,6 +656,14 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
         'A': [m.display_name for m, _ in team1_sorted if m],
         'B': [m.display_name for m, _ in team2_sorted if m]
     }
+    save_json("teams_display.json", teams)
+
+    last_teams = {
+        guild_id: {
+            "team_a": {str(m.id): lane for m, lane in team1_sorted if m},
+            "team_b": {str(m.id): lane for m, lane in team2_sorted if m}
+        }
+    }
     save_json(team_file, teams)
 
     with open("current_teams.json", "w", encoding="utf-8") as f:
@@ -663,7 +677,7 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
 @bot.command()
 async def show_teams(ctx):
     last_teams = load_json(team_file)
-    if not last_teams or "team_a" not in last_teams or "team_b" not in last_teams:
+    if not last_teams or guild_id not in last_teams or "team_a" not in last_teams[guild_id]:
         await ctx.send("保存されたチームが見つかりません。")
         return
 
@@ -691,7 +705,7 @@ async def swap(ctx, member1: discord.Member, member2: discord.Member):
     guild_id = str(ctx.guild.id)
     last_teams = load_json(team_file)  # JSONに統一
 
-    if guild_id not in last_teams or "team_a" not in last_teams[guild_id] or "team_b" not in last_teams[guild_id]:
+    if guild_id not in last_teams or "team_a" not in last_teams[guild_id]:
         await ctx.send("直近のチームが存在しません。")
         return
 
@@ -729,7 +743,7 @@ async def win(ctx, winner: str):
         return
 
     last_teams = load_json(team_file)
-    if not last_teams or "team_a" not in last_teams or "team_b" not in last_teams:
+    if not last_teams or guild_id not in last_teams or "team_a" not in last_teams[guild_id]:
         await ctx.send("直近のチームデータが見つかりません。")
         return
 
