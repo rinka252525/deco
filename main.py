@@ -482,12 +482,12 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
             valid_team1 = True
 
                 # チーム1のロール割り当て
-                for uid, lane in zip(team1_ids, team1_roles):
-                    prefs = participants[guild_id].get(uid, [])
-                    if prefs and lane not in prefs and 'fill' not in prefs:
-                        valid_team1 = False
-                        break
-                    role_map[uid] = lane
+            for uid, lane in zip(team1_ids, team1_roles):
+                prefs = participants[guild_id].get(uid, [])
+                if prefs and lane not in prefs and 'fill' not in prefs:
+                    valid_team1 = False
+                    break
+                role_map[uid] = lane
 
             if not valid_team1:
                 continue
