@@ -449,13 +449,15 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
         }, f, indent=4, ensure_ascii=False)
 
 
+from itertools import combinations, permutations
+
 @bot.command()
 async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
     guild_id = ctx.guild.id
     lanes = ['top', 'jg', 'mid', 'adc', 'sup']
     global last_teams
 
-    # ギルドIDがparticipantsに存在しない、または参加者が10人未満の場合は中断
+    # 参加者数チェック
     if guild_id not in participants or len(participants[guild_id]) < 10:
         await ctx.send("参加者が10人未満です。")
         return
@@ -463,7 +465,7 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
     member_ids = list(participants[guild_id].keys())
     server_data = get_server_data(guild_id)
 
-    # 能力値未登録のメンバーがいる場合は中断
+    # 能力値未登録者チェック
     if not all(str(mid) in server_data for mid in member_ids):
         unregistered_ids = [mid for mid in member_ids if str(mid) not in server_data]
         mention_list = ', '.join(f'<@{uid}>' for uid in unregistered_ids)
@@ -481,7 +483,7 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
             role_map = {}
             valid_team1 = True
 
-                # チーム1のロール割り当て
+            # チーム1のロール割り当て
             for uid, lane in zip(team1_ids, team1_roles):
                 prefs = participants[guild_id].get(uid, [])
                 if prefs and lane not in prefs and 'fill' not in prefs:
@@ -491,7 +493,9 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
 
             if not valid_team1:
                 continue
-                # チーム2のロール割り当て（希望レーン考慮）
+
+            # チーム2のロール割り当てとスコア評価
+            try:
                 valid = False
                 for team2_roles in permutations(lanes):
                     try_role_map = role_map.copy()
@@ -560,117 +564,43 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
         await ctx.send("チーム分けに失敗しました。条件を緩和するか、参加者の希望レーンや能力値を見直してください。")
         return
 
-    if best_result:
-        team1_ids, team2_ids, role_map = best_result
+    team1_ids, team2_ids, role_map = best_result
 
-        teams = {
-            'A': [m.display_name for m, _ in team1_sorted if m],
-            'B': [m.display_name for m, _ in team2_sorted if m]
-        }
-        save_json("teams_display.json", teams)
+    # 最終チーム保存
+    last_teams = {
+        "team_a": {str(uid): role_map[uid] for uid in team1_ids},
+        "team_b": {str(uid): role_map[uid] for uid in team2_ids},
+        "guild_id": str(ctx.guild.id)
+    }
+    save_json(team_file, last_teams)
 
-        last_teams = {
-            "team_a": {str(uid): role_map[uid] for uid in team1_ids},
-            "team_b": {str(uid): role_map[uid] for uid in team2_ids},
-            "guild_id": str(ctx.guild.id)
-        }
+    # 表示用名前も保存
+    team1_sorted = sorted([(ctx.guild.get_member(uid), role_map[uid]) for uid in team1_ids], key=lambda x: lanes.index(x[1]))
+    team2_sorted = sorted([(ctx.guild.get_member(uid), role_map[uid]) for uid in team2_ids], key=lambda x: lanes.index(x[1]))
 
-        save_json(team_file, last_teams)
-
-        msg = "**チームが決まりました！**\n"
-        msg += "**Team A**\n"
-        for uid in team1_ids:
-            member = ctx.guild.get_member(uid)
-            lane = role_map[uid]
-            val = server_data[str(uid)][lane]
-            msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
-
-        msg += "\n**Team B**\n"
-        for uid in team2_ids:
-            member = ctx.guild.get_member(uid)
-            lane = role_map[uid]
-            val = server_data[str(uid)][lane]
-            msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
-
-        if best_score >= 1000:
-            msg += "\n⚠️ 条件を完全には満たすチームは見つかりませんでしたが、最善の組み合わせを選びました。"
-    #await ctx.send(msg)
-
-    
-
-    # 表示用フォーマット関数
-        def team_description(team_ids):
-            lines = []
-            for uid in team_ids:
-                member = ctx.guild.get_member(uid)
-                name = member.display_name if member else f"User {uid}"
-                lane = role_map[uid]
-                ability = server_data[str(uid)][lane]
-                lines.append(f"{lane.upper()}: {name} ({ability})")
-            return '\n'.join(lines)
-
-        team_a_total = sum(server_data[str(uid)][role_map[uid]] for uid in team1_ids)
-        team_b_total = sum(server_data[str(uid)][role_map[uid]] for uid in team2_ids)
-
-    # チーム情報を保存
-    
-        last_teams[str(guild_id)] = {
-            "team_a": {uid: role_map[uid] for uid in team1_ids},
-            "team_b": {uid: role_map[uid] for uid in team2_ids}
-        }
-        save_data(team_file, last_teams)
-
-    # 名前付き情報も保存
-        def sort_by_lane(team):
-            return sorted(team, key=lambda x: lanes.index(x[1]))
-
-        team1_named = [(ctx.guild.get_member(uid), role_map[uid]) for uid in team1_ids]
-        team2_named = [(ctx.guild.get_member(uid), role_map[uid]) for uid in team2_ids]
-        team1_sorted = sort_by_lane(team1_named)
-        team2_sorted = sort_by_lane(team2_named)
-
-        def calc_team_score(team):
-            return sum(server_data[str(m.id)][lane] for m, lane in team if m)
-
-        score1 = calc_team_score(team1_sorted)
-        score2 = calc_team_score(team2_sorted)
-
-        def format_team(team, score):
-            lines = [f"**Total: {score}**"]
-            for member, lane in team:
-                if member:
-                    val = server_data[str(member.id)][lane]
-                    lines.append(f"{lane.upper()}: {member.display_name} ({val})")
-            return "\n".join(lines)
-
-        team_msg = "**チーム分け結果（再表示）**\n\n"
-        team_msg += "__**Team A**__\n" + format_team(team1_sorted, score1) + "\n\n"
-        team_msg += "__**Team B**__\n" + format_team(team2_sorted, score2)
-
-        if warnings:
-            team_msg += "\n⚠️ **警告**:\n" + "\n".join(warnings)
-        await ctx.send(team_msg)
-
-    # JSON保存
     teams = {
         'A': [m.display_name for m, _ in team1_sorted if m],
         'B': [m.display_name for m, _ in team2_sorted if m]
     }
     save_json("teams_display.json", teams)
 
-    last_teams = {
-        guild_id: {
-            "team_a": {str(m.id): lane for m, lane in team1_sorted if m},
-            "team_b": {str(m.id): lane for m, lane in team2_sorted if m}
-        }
-    }
-    save_json(team_file, teams)
+    # メッセージ表示
+    msg = "**チームが決まりました！**\n"
+    msg += "**Team A**\n"
+    for member, lane in team1_sorted:
+        val = server_data[str(member.id)][lane]
+        msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
 
-    with open("current_teams.json", "w", encoding="utf-8") as f:
-        json.dump({
-            'A': {lane: m.display_name for m, lane in team1_sorted if m},
-            'B': {lane: m.display_name for m, lane in team2_sorted if m}
-        }, f, indent=4, ensure_ascii=False)
+    msg += "\n**Team B**\n"
+    for member, lane in team2_sorted:
+        val = server_data[str(member.id)][lane]
+        msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
+
+    if best_score >= 1000:
+        msg += "\n⚠️ 条件を完全には満たすチームは見つかりませんでしたが、最善の組み合わせを選びました。\n"
+        msg += "\n".join(f"⚠️ {w}" for w in warnings)
+
+    await ctx.send(msg)
 
 
 
