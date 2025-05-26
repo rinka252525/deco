@@ -651,7 +651,7 @@ async def reset(ctx):
 @bot.command(name="help_bb")
 async def help_command(ctx):
     await ctx.send("""
-📘 Botコマンド一覧
+🐉 BaronBrainコマンド一覧 🐉
 
 !ability @user 10 10 10 10 10 - 能力値登録
 !delete_ability @user - 能力値削除
