@@ -350,89 +350,89 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
         await ctx.send("チーム分けに失敗しました。条件を緩和するか、参加者の希望レーンや能力値を見直してください。")
         return
 
-if best_result:
-    team1_ids, team2_ids, role_map = best_result
+    if best_result:
+        team1_ids, team2_ids, role_map = best_result
 
-    last_teams = {
-        "team_a": {str(uid): role_map[uid] for uid in team1_ids},
-        "team_b": {str(uid): role_map[uid] for uid in team2_ids},
-        "guild_id": str(ctx.guild.id)
-    }
+        last_teams = {
+            "team_a": {str(uid): role_map[uid] for uid in team1_ids},
+            "team_b": {str(uid): role_map[uid] for uid in team2_ids},
+            "guild_id": str(ctx.guild.id)
+        }
 
-    save_json(team_file, last_teams)
+        save_json(team_file, last_teams)
 
-    msg = "**チームが決まりました！**\n"
-    msg += "**Team A**\n"
-    for uid in team1_ids:
-        member = ctx.guild.get_member(uid)
-        lane = role_map[uid]
-        val = server_data[str(uid)][lane]
-        msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
+        msg = "**チームが決まりました！**\n"
+        msg += "**Team A**\n"
+        for uid in team1_ids:
+            member = ctx.guild.get_member(uid)
+            lane = role_map[uid]
+            val = server_data[str(uid)][lane]
+            msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
 
-    msg += "\n**Team B**\n"
-    for uid in team2_ids:
-        member = ctx.guild.get_member(uid)
-        lane = role_map[uid]
-        val = server_data[str(uid)][lane]
-        msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
+        msg += "\n**Team B**\n"
+        for uid in team2_ids:
+            member = ctx.guild.get_member(uid)
+            lane = role_map[uid]
+            val = server_data[str(uid)][lane]
+            msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
 
-    if best_score >= 1000:
-        msg += "\n⚠️ 条件を完全には満たすチームは見つかりませんでしたが、最善の組み合わせを選びました。"
+        if best_score >= 1000:
+            msg += "\n⚠️ 条件を完全には満たすチームは見つかりませんでしたが、最善の組み合わせを選びました。"
     #await ctx.send(msg)
 
     
 
     # 表示用フォーマット関数
-    def team_description(team_ids):
-        lines = []
-        for uid in team_ids:
-            member = ctx.guild.get_member(uid)
-            name = member.display_name if member else f"User {uid}"
-            lane = role_map[uid]
-            ability = server_data[str(uid)][lane]
-            lines.append(f"{lane.upper()}: {name} ({ability})")
-        return '\n'.join(lines)
+        def team_description(team_ids):
+            lines = []
+            for uid in team_ids:
+                member = ctx.guild.get_member(uid)
+                name = member.display_name if member else f"User {uid}"
+                lane = role_map[uid]
+                ability = server_data[str(uid)][lane]
+                lines.append(f"{lane.upper()}: {name} ({ability})")
+            return '\n'.join(lines)
 
-    team_a_total = sum(server_data[str(uid)][role_map[uid]] for uid in team1_ids)
-    team_b_total = sum(server_data[str(uid)][role_map[uid]] for uid in team2_ids)
+        team_a_total = sum(server_data[str(uid)][role_map[uid]] for uid in team1_ids)
+        team_b_total = sum(server_data[str(uid)][role_map[uid]] for uid in team2_ids)
 
     # チーム情報を保存
     
-    last_teams[str(guild_id)] = {
-        "team_a": {uid: role_map[uid] for uid in team1_ids},
-        "team_b": {uid: role_map[uid] for uid in team2_ids}
-    }
-    save_data(team_file, last_teams)
+        last_teams[str(guild_id)] = {
+            "team_a": {uid: role_map[uid] for uid in team1_ids},
+            "team_b": {uid: role_map[uid] for uid in team2_ids}
+        }
+        save_data(team_file, last_teams)
 
     # 名前付き情報も保存
-    def sort_by_lane(team):
-        return sorted(team, key=lambda x: lanes.index(x[1]))
+        def sort_by_lane(team):
+            return sorted(team, key=lambda x: lanes.index(x[1]))
 
-    team1_named = [(ctx.guild.get_member(uid), role_map[uid]) for uid in team1_ids]
-    team2_named = [(ctx.guild.get_member(uid), role_map[uid]) for uid in team2_ids]
-    team1_sorted = sort_by_lane(team1_named)
-    team2_sorted = sort_by_lane(team2_named)
+        team1_named = [(ctx.guild.get_member(uid), role_map[uid]) for uid in team1_ids]
+        team2_named = [(ctx.guild.get_member(uid), role_map[uid]) for uid in team2_ids]
+        team1_sorted = sort_by_lane(team1_named)
+        team2_sorted = sort_by_lane(team2_named)
 
-    def calc_team_score(team):
-        return sum(server_data[str(m.id)][lane] for m, lane in team if m)
+        def calc_team_score(team):
+            return sum(server_data[str(m.id)][lane] for m, lane in team if m)
 
-    score1 = calc_team_score(team1_sorted)
-    score2 = calc_team_score(team2_sorted)
+        score1 = calc_team_score(team1_sorted)
+        score2 = calc_team_score(team2_sorted)
 
-    def format_team(team, score):
-        lines = [f"**Total: {score}**"]
-        for member, lane in team:
-            if member:
-                val = server_data[str(member.id)][lane]
-                lines.append(f"{lane.upper()}: {member.display_name} ({val})")
-        return "\n".join(lines)
+        def format_team(team, score):
+            lines = [f"**Total: {score}**"]
+            for member, lane in team:
+                if member:
+                    val = server_data[str(member.id)][lane]
+                    lines.append(f"{lane.upper()}: {member.display_name} ({val})")
+            return "\n".join(lines)
 
-    team_msg = "**チーム分け結果（再表示）**\n\n"
-    team_msg += "__**Team A**__\n" + format_team(team1_sorted, score1) + "\n\n"
-    team_msg += "__**Team B**__\n" + format_team(team2_sorted, score2)
+        team_msg = "**チーム分け結果（再表示）**\n\n"
+        team_msg += "__**Team A**__\n" + format_team(team1_sorted, score1) + "\n\n"
+        team_msg += "__**Team B**__\n" + format_team(team2_sorted, score2)
 
-    if warnings:
-        team_msg += "\n⚠️ **警告**:\n" + "\n".join(warnings)
+        if warnings:
+            team_msg += "\n⚠️ **警告**:\n" + "\n".join(warnings)
         await ctx.send(team_msg)
 
     # JSON保存
