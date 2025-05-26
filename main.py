@@ -400,12 +400,13 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
 
 @bot.command()
 async def show_teams(ctx):
+    guild_id = str(ctx.guild.id)  # 先に定義する
     last_teams = load_json(team_file)
+
     if not last_teams or guild_id not in last_teams or "team_a" not in last_teams[guild_id]:
         await ctx.send("保存されたチームが見つかりません。")
         return
 
-    guild_id = str(ctx.guild.id)
     server_data = get_server_data(guild_id)
 
     def format_team(team, name):
@@ -418,8 +419,8 @@ async def show_teams(ctx):
             msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
         return msg
 
-    msg = format_team(last_teams["team_a"], "Team A")
-    msg += "\n" + format_team(last_teams["team_b"], "Team B")
+    msg = format_team(last_teams[guild_id]["team_a"], "Team A")
+    msg += "\n" + format_team(last_teams[guild_id]["team_b"], "Team B")
 
     await ctx.send(msg)
 
@@ -427,35 +428,57 @@ async def show_teams(ctx):
 @bot.command()
 async def swap(ctx, member1: discord.Member, member2: discord.Member):
     guild_id = str(ctx.guild.id)
-    last_teams = load_json(team_file)  # JSONに統一
+    last_teams = load_json(team_file)
 
-    if guild_id not in last_teams or "team_a" not in last_teams[guild_id]:
-        await ctx.send("直近のチームが存在しません。")
+    if not last_teams or guild_id not in last_teams:
+        await ctx.send("直近のチームデータが存在しません。")
         return
 
-    all_teams = {**last_teams[guild_id]['team_a'], **last_teams[guild_id]['team_b']}
-    uid1 = str(member1.id)
-    uid2 = str(member2.id)
+    teams = last_teams[guild_id]
+    team_a = teams.get("team_a", {})
+    team_b = teams.get("team_b", {})
 
-    if uid1 not in all_teams or uid2 not in all_teams:
-        await ctx.send("指定したメンバーがチームにいません。")
+    uid1, uid2 = str(member1.id), str(member2.id)
+
+    def find_team_and_lane(uid):
+        if uid in team_a:
+            return "A", team_a[uid]
+        elif uid in team_b:
+            return "B", team_b[uid]
+        return None, None
+
+    team1, lane1 = find_team_and_lane(uid1)
+    team2, lane2 = find_team_and_lane(uid2)
+
+    if team1 is None or team2 is None:
+        await ctx.send("どちらかのユーザーが現在のチームに含まれていません。")
         return
 
-    # レーンを入れ替える
-    lane1 = all_teams[uid1]
-    lane2 = all_teams[uid2]
+    if team1 == team2:
+        # 同じチーム内 → レーンだけ交換
+        if team1 == "A":
+            team_a[uid1], team_a[uid2] = lane2, lane1
+        else:
+            team_b[uid1], team_b[uid2] = lane2, lane1
+        await ctx.send("同じチーム内のレーンを交換しました。")
+    else:
+        # 異なるチーム → チームとレーンごと交換
+        if team1 == "A":
+            team_a.pop(uid1)
+            team_b.pop(uid2)
+            team_a[uid2] = lane2
+            team_b[uid1] = lane1
+        else:
+            team_b.pop(uid1)
+            team_a.pop(uid2)
+            team_b[uid2] = lane2
+            team_a[uid1] = lane1
+        await ctx.send("異なるチーム間のメンバーとレーンを交換しました。")
 
-    for team_key in ['team_a', 'team_b']:
-        if uid1 in last_teams[guild_id][team_key]:
-            last_teams[guild_id][team_key][uid2] = lane1
-            del last_teams[guild_id][team_key][uid1]
-        if uid2 in last_teams[guild_id][team_key]:
-            last_teams[guild_id][team_key][uid1] = lane2
-            del last_teams[guild_id][team_key][uid2]
-
-    save_json(team_file, last_teams)  # JSONに保存
-
+    save_data(team_file, last_teams)
     await ctx.invoke(bot.get_command("show_teams"))
+
+
 
 
 
@@ -466,23 +489,23 @@ async def win(ctx, winner: str):
         await ctx.send("勝者は A または B で指定してください。")
         return
 
+    guild_id = str(ctx.guild.id)  # 先に定義する
     last_teams = load_json(team_file)
+
     if not last_teams or guild_id not in last_teams or "team_a" not in last_teams[guild_id]:
         await ctx.send("直近のチームデータが見つかりません。")
         return
 
-    # あとは last_teams["team_a"] / ["team_b"] からメンバーIDとレーンを取り出して処理
+    server_data = get_server_data(guild_id)
+    history_data = load_json("history.json")
 
+    winner_key = "team_a" if winner == 'A' else "team_b"
+    loser_key = "team_b" if winner == 'A' else "team_a"
 
-    winner_key = "team_a" if result == 'A' else "team_b"
-    loser_key = "team_b" if result == 'A' else "team_a"
-    
-
-    winner = last_teams[guild_id][winner_key]
-    loser = last_teams[guild_id][loser_key]
+    team_win = last_teams[guild_id][winner_key]
+    team_lose = last_teams[guild_id][loser_key]
 
     def update_ability(uid, lane, is_winner, match_count):
-        # 試合数によって補正
         delta = 10 if match_count < 5 else 2
         ability = server_data[uid][lane]
         if is_winner:
@@ -498,7 +521,7 @@ async def win(ctx, winner: str):
             history_data[uid]["lanes"][lane] = {"win": 0, "lose": 0}
         history_data[uid]["lanes"][lane]["win" if is_winner else "lose"] += 1
 
-    for team, is_winner in [(winner, True), (loser, False)]:
+    for team, is_winner in [(team_win, True), (team_lose, False)]:
         for uid_str, lane in team.items():
             if uid_str not in server_data or lane not in server_data[uid_str]:
                 continue
@@ -509,7 +532,7 @@ async def win(ctx, winner: str):
 
     save_data(data_file, server_data)
     save_data("history.json", history_data)
-    await ctx.send(f"チーム{result} の勝利を記録しました。能力値と戦績を更新しました。")
+    await ctx.send(f"チーム{winner} の勝利を記録しました。能力値と戦績を更新しました。")
 
 
 
