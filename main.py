@@ -363,7 +363,7 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     # 最終チーム保存
     last_teams = load_json(team_file)
     if not last_teams:
-        last teams = {}
+        last_teams = {}
     last_teams[str(ctx.guild.id)] = {
         "team_a": {str(uid): role_map[uid] for uid in team1_ids},
         "team_b": {str(uid): role_map[uid] for uid in team2_ids},
