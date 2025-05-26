@@ -605,6 +605,7 @@ async def show_custom(ctx, member: discord.Member = None):
     await ctx.send(msg)
 
 
+
 # bot.run(...) は既に実行中のコードで保持
 # 他のコマンドとの統合が必要な場合はお知らせください。
 
