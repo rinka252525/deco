@@ -275,7 +275,7 @@ async def make_teams2(ctx, lane_diff: int = 40, team_diff: int = 50):
                 role_map = {}
                 assigned = set()
 
-lanes = ['top', 'jg', 'mid', 'adc', 'sup']
+#lanes = ['top', 'jg', 'mid', 'adc', 'sup']
 
 for team1_ids in combinations(vc_ids, 5):
     team2_ids = [uid for uid in vc_ids if uid not in team1_ids]
