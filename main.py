@@ -411,10 +411,12 @@ async def show_teams(ctx):
         return
 
     server_data = get_server_data(guild_id)
+    lane_order = ['top', 'jg', 'mid', 'adc', 'sup']
 
     def format_team(team, name):
         msg = f"**{name}**\n"
-        for uid, lane in team.items():
+        sorted_items = sorted(team.items(), key=lambda item: lane_order.index(item[1]) if item[1] in lane_order else 999)
+        for uid, lane in sorted_items:
             member = ctx.guild.get_member(int(uid))
             if not member:
                 continue
@@ -426,6 +428,7 @@ async def show_teams(ctx):
     msg += "\n" + format_team(last_teams[guild_id]["team_b"], "Team B")
 
     await ctx.send(msg)
+
 
         
 @bot.command()
