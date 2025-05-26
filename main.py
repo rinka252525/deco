@@ -188,7 +188,7 @@ async def join(ctx, *args):
 
     participants[guild_id][user_id] = preferred_lanes
     lanes_str = f"{lane1.upper()} / {lane2.upper()}" if lane1 != lane2 else lane1.upper()
-    await ctx.send(f"{member.display_name} が [{lane_str}] で参加登録しました。")
+    await ctx.send(f"{member.display_name} が [{lanes_str}] で参加登録しました。")
 
 
 
@@ -382,14 +382,17 @@ async def make_teams(ctx, lane_diff: int = 40, team_diff: int = 50):
     }
     save_json("teams_display.json", teams)
 
+    team1_total = sum(server_data[str(uid)][role_map[uid]] for uid in team1_ids)
+    team2_total = sum(server_data[str(uid)][role_map[uid]] for uid in team2_ids)
+
     # メッセージ表示
     msg = "**チームが決まりました！**\n"
-    msg += "**Team A**\n"
+    msg += "**Team A**（合計: {team1_total}）\n"
     for member, lane in team1_sorted:
         val = server_data[str(member.id)][lane]
         msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
 
-    msg += "\n**Team B**\n"
+    msg += "\n**Team B**（合計: {team2_total}\n"
     for member, lane in team2_sorted:
         val = server_data[str(member.id)][lane]
         msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
@@ -417,12 +420,15 @@ async def show_teams(ctx):
     def format_team(team, name):
         msg = f"**{name}**\n"
         sorted_items = sorted(team.items(), key=lambda item: lane_order.index(item[1]) if item[1] in lane_order else 999)
+        total = 0
         for uid, lane in sorted_items:
             member = ctx.guild.get_member(int(uid))
             if not member:
                 continue
             val = server_data.get(uid, {}).get(lane, 0)
+            total += val
             msg += f"{member.display_name}（{lane.upper()} - {val}）\n"
+        msg += f"**合計: {total}**\n"
         return msg
 
     msg = format_team(last_teams[guild_id]["team_a"], "Team A")
@@ -469,21 +475,22 @@ async def swap(ctx, member1: discord.Member, member2: discord.Member):
             team_b[uid1], team_b[uid2] = lane2, lane1
         await ctx.send("同じチーム内のレーンを交換しました。")
     else:
-        # 異なるチーム → チームとレーンごと交換
+        # 異なるチーム → メンバーだけを入れ替え、レーンは元のまま維持
         if team1 == "A":
             team_a.pop(uid1)
             team_b.pop(uid2)
-            team_a[uid2] = lane2
-            team_b[uid1] = lane1
+            team_a[uid2] = lane1  # user2 が user1 のレーンを担当
+            team_b[uid1] = lane2  # user1 が user2 のレーンを担当
         else:
             team_b.pop(uid1)
             team_a.pop(uid2)
-            team_b[uid2] = lane2
-            team_a[uid1] = lane1
-        await ctx.send("異なるチーム間のメンバーとレーンを交換しました。")
+            team_b[uid2] = lane1
+            team_a[uid1] = lane2
+        await ctx.send("異なるチーム間のメンバーをレーンを維持したまま交換しました。")
 
     save_data(team_file, last_teams)
     await ctx.invoke(bot.get_command("show_teams"))
+
 
 
 
