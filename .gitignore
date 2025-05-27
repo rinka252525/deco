@@ -1,0 +1,28 @@
+# Pythonキャッシュファイル
+main/__pycache__/
+main/*.pyc
+
+# 環境ファイル（もし使っていれば）
+main/.env
+
+# 機密・一時・ログ・キャッシュファイルなど
+main/abilities.json
+main/current_teams.json
+main/custom_history.json
+main/history.json
+main/last_teams.json
+main/match_history.json
+
+# 開発用スクリプト（任意で除外）
+main/keep_alive.py
+
+# 仮想環境（もしプロジェクトルートにある場合）
+venv/
+.venv/
+
+# OS/エディタ関連
+.DS_Store
+*.log
+*.sqlite3
+.vscode/
+.idea/
