@@ -670,5 +670,7 @@ async def help_command(ctx):
 !show_custom @user - 各個人のカスタム勝率
 
 """)
+from keep_alive import keep_alive
 
+keep_alive()
 bot.run(os.environ['DISCORD_BOT_TOKEN'])
